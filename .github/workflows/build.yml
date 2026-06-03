@@ -1,0 +1,40 @@
+name: Build TypeScript
+
+on:
+  push:
+    branches: [main, gh-pages]
+    paths:
+      - 'src/**'
+      - 'tsconfig.json'
+      - 'package.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Commit compiled files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add js/
+          git diff --quiet && git diff --staged --quiet || git commit -m "build: compile TypeScript"
+
+      - name: Push changes
+        run: git push

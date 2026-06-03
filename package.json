@@ -1,0 +1,12 @@
+{
+  "name": "swe-bench-ui",
+  "version": "1.0.0",
+  "description": "Generic viewer for SWE bench evaluation results",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

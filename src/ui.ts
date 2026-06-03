@@ -1,14 +1,25 @@
-import { escapeHtml, getResolvedStatus, getStatusColor, getStatusText } from './utils.js';
+import { escapeHtml, getResolvedStatus, getStatusColor, getStatusText, Request } from './utils.js';
+
+export interface Dump {
+    name: string;
+    data: unknown | null;
+    requests: Request[];
+}
+
 export class UI {
-    constructor(containerId, maxDumps = 4) {
-        this.callbacks = new Map();
+    private container: HTMLElement;
+    private maxDumps: number;
+    private callbacks: Map<string, Function> = new Map();
+
+    constructor(containerId: string, maxDumps: number = 4) {
         const el = document.getElementById(containerId);
-        if (!el)
-            throw new Error(`Container with id ${containerId} not found`);
+        if (!el) throw new Error(`Container with id ${containerId} not found`);
+
         this.container = el;
         this.maxDumps = maxDumps;
     }
-    renderDumps(dumps) {
+
+    renderDumps(dumps: Dump[]): void {
         this.container.innerHTML = dumps.map((dump, idx) => `
             <div class="dump-panel">
                 <div class="dump-header">
@@ -25,6 +36,7 @@ export class UI {
                 ` : '<div class="no-data">No data</div>'}
             </div>
         `).join('');
+
         dumps.forEach((dump, idx) => {
             if (dump.requests.length > 0) {
                 this.renderNav(idx, dump.requests.length);
@@ -33,27 +45,33 @@ export class UI {
             this.setupDropZone(idx);
         });
     }
-    renderNav(dumpIdx, requestCount) {
+
+    renderNav(dumpIdx: number, requestCount: number): void {
         const nav = document.getElementById(`nav-${dumpIdx}`);
-        if (!nav)
-            return;
+        if (!nav) return;
+
         nav.innerHTML = Array.from({ length: requestCount }, (_, i) => `
             <button class="req-btn ${i === 0 ? 'active' : ''}" onclick="window.app.selectRequest(${i}, ${dumpIdx})">R${i + 1}</button>
         `).join('');
     }
-    renderRequest(dumpIdx, reqIdx, req) {
+
+    renderRequest(dumpIdx: number, reqIdx: number, req: Request | undefined): void {
         const contentEl = document.getElementById(`content-${dumpIdx}`);
-        if (!contentEl || !req)
-            return;
+        if (!contentEl || !req) return;
+
         let html = this.buildMessageBlocks(req);
         const resolved = getResolvedStatus(req);
+
         if (resolved !== null) {
             html += `<div class="message-block" style="border-left: 3px solid ${getStatusColor(resolved)};"><strong>${getStatusText(resolved)}</strong></div>`;
         }
+
         contentEl.innerHTML = html;
     }
-    buildMessageBlocks(req) {
+
+    private buildMessageBlocks(req: Request): string {
         let html = '';
+
         if (req.messages && Array.isArray(req.messages)) {
             req.messages.forEach(msg => {
                 const role = msg.role || 'unknown';
@@ -65,8 +83,7 @@ export class UI {
                     </div>
                 `;
             });
-        }
-        else if (req.prompt) {
+        } else if (req.prompt) {
             html += `
                 <div class="message-block">
                     <div class="message-role">👤 Input</div>
@@ -74,6 +91,7 @@ export class UI {
                 </div>
             `;
         }
+
         if (req.response) {
             html += `
                 <div class="message-block">
@@ -82,6 +100,7 @@ export class UI {
                 </div>
             `;
         }
+
         if (req.prompt_tokens !== undefined || req.latency_seconds !== undefined || req.completion_tokens !== undefined) {
             html += `
                 <div class="message-block">
@@ -90,28 +109,33 @@ export class UI {
                 </div>
             `;
         }
+
         return html;
     }
-    setupDropZone(idx) {
+
+    private setupDropZone(idx: number): void {
         const dropZone = document.getElementById(`dropZone-${idx}`);
-        if (!dropZone)
-            return;
+        if (!dropZone) return;
+
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
         });
+
         dropZone.addEventListener('dragleave', (e) => {
             dropZone.classList.remove('dragover');
         });
+
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
         });
     }
-    editDumpName(idx, dumps) {
+
+    editDumpName(idx: number, dumps: Dump[]): void {
         const titleEl = document.getElementById(`title-${idx}`);
-        if (!titleEl)
-            return;
+        if (!titleEl) return;
+
         const input = document.createElement('input');
         input.type = 'text';
         input.value = dumps[idx].name;
@@ -120,18 +144,18 @@ export class UI {
             this.renderDumps(dumps);
         };
         input.onkeydown = (e) => {
-            if (e.key === 'Enter')
-                input.blur();
+            if (e.key === 'Enter') input.blur();
         };
         titleEl.replaceWith(input);
         input.focus();
         input.select();
     }
-    canAddDump(dumpCount) {
+
+    canAddDump(dumpCount: number): boolean {
         return dumpCount < this.maxDumps;
     }
-    on(event, callback) {
+
+    on(event: string, callback: Function): void {
         this.callbacks.set(event, callback);
     }
 }
-//# sourceMappingURL=ui.js.map
