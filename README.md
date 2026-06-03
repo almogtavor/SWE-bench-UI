@@ -1,15 +1,16 @@
-# SWE-bench-UI
+<div align="center">
+
+<img src="logo.png" width="25%">
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 Generic viewer for SWE bench evaluation results. Upload, compare, and analyze SWE bench dumps side-by-side.
 
-## Features
+</div>
 
-- **Multi-dump support**: Load up to 4 evaluation dumps simultaneously
-- **Generic interface**: Works with any SWE bench result format
-- **Customizable names**: Rename each dump after uploading
-- **Side-by-side view**: Compare results across multiple evaluations
-- **Dark/light mode**: Toggle between themes
-- **Drag-and-drop**: Easy file upload with drag-and-drop zones
+<hr />
+
 
 ## Usage
 
