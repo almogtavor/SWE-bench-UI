@@ -34,34 +34,14 @@ python -m http.server 8000
 - JSONL format (line-delimited LiteLLM traces)
 - Simple request/response arrays
 
-## Project Structure
-
-```
-SWE-bench-UI/
-├── index.html          # Main HTML entry point
-├── css/
-│   └── styles.css      # All styling (light/dark themes)
-├── js/
-│   ├── app.js         # Main app class and initialization
-│   ├── ui.js          # UI rendering functions
-│   ├── theme.js       # Theme manager
-│   ├── fileHandling.js # File upload and parsing
-│   ├── navigation.js   # Request navigation logic
-│   └── utils.js       # Utility functions
-└── README.md
-```
-
 ## Features
 
 - Multi-dump support (up to 4 concurrent dumps)
 - Generic interface (works with any SWE bench format)
 - Customizable dump names
 - Side-by-side request comparison
-- Dark/light mode toggle with localStorage persistence
+- Dark/light mode toggle
 - Drag-and-drop file upload
-- Request navigation with keyboard support
-- Metrics display (tokens, latency)
-- Pass/fail evaluation detection
 
 ## License
 
