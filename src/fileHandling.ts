@@ -65,18 +65,36 @@ export class FileHandler {
     }
 
     private parseFile(text: string): Request[] {
-        const parsed = JSON.parse(text);
+        const trimmed = text.trim();
 
-        if (parsed.baseline && parsed.baseline.requests) {
-            return parsed.baseline.requests;
-        } else if (parsed.spans && parsed.spans.requests) {
-            return parsed.spans.requests;
-        } else if (parsed.requests && Array.isArray(parsed.requests)) {
-            return parsed.requests;
-        } else if (Array.isArray(parsed)) {
-            return parsed;
+        if (trimmed.startsWith('[')) {
+            const parsed = JSON.parse(trimmed);
+
+            if (parsed.baseline && parsed.baseline.requests) {
+                return parsed.baseline.requests;
+            } else if (parsed.spans && parsed.spans.requests) {
+                return parsed.spans.requests;
+            } else if (parsed.requests && Array.isArray(parsed.requests)) {
+                return parsed.requests;
+            } else if (Array.isArray(parsed)) {
+                return parsed;
+            } else {
+                return [parsed];
+            }
         } else {
-            return [parsed];
+            const lines = trimmed.split('\n').filter(line => line.trim());
+            const requests: Request[] = [];
+
+            for (const line of lines) {
+                try {
+                    const obj = JSON.parse(line);
+                    requests.push(obj);
+                } catch (e) {
+                    console.warn('Failed to parse JSONL line:', line);
+                }
+            }
+
+            return requests.length > 0 ? requests : [JSON.parse(trimmed)];
         }
     }
 

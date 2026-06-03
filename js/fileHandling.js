@@ -52,21 +52,38 @@ export class FileHandler {
         }
     }
     parseFile(text) {
-        const parsed = JSON.parse(text);
-        if (parsed.baseline && parsed.baseline.requests) {
-            return parsed.baseline.requests;
-        }
-        else if (parsed.spans && parsed.spans.requests) {
-            return parsed.spans.requests;
-        }
-        else if (parsed.requests && Array.isArray(parsed.requests)) {
-            return parsed.requests;
-        }
-        else if (Array.isArray(parsed)) {
-            return parsed;
+        const trimmed = text.trim();
+        if (trimmed.startsWith('[')) {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.baseline && parsed.baseline.requests) {
+                return parsed.baseline.requests;
+            }
+            else if (parsed.spans && parsed.spans.requests) {
+                return parsed.spans.requests;
+            }
+            else if (parsed.requests && Array.isArray(parsed.requests)) {
+                return parsed.requests;
+            }
+            else if (Array.isArray(parsed)) {
+                return parsed;
+            }
+            else {
+                return [parsed];
+            }
         }
         else {
-            return [parsed];
+            const lines = trimmed.split('\n').filter(line => line.trim());
+            const requests = [];
+            for (const line of lines) {
+                try {
+                    const obj = JSON.parse(line);
+                    requests.push(obj);
+                }
+                catch (e) {
+                    console.warn('Failed to parse JSONL line:', line);
+                }
+            }
+            return requests.length > 0 ? requests : [JSON.parse(trimmed)];
         }
     }
     triggerFileInput(idx) {
