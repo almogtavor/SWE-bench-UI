@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="logo.png" width="25%">
+
 # SWE-bench-UI
 
 Generic viewer for SWE bench evaluation results. Upload, compare, and analyze SWE bench dumps side-by-side.
