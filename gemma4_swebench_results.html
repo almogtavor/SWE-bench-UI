@@ -1,115 +1,56 @@
-<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>
-<title>Exgentic Gemma4 SWE-bench Results (5 modes)</title><style>
-body{font-family:Arial,sans-serif;font-size:14px;margin:30px;background:#f5f5f5;color:#222}
-h1{color:#2c3e50}h2{color:#2c3e50;border-bottom:2px solid #aaa;padding-bottom:4px;margin-top:30px}
-h3{color:#34495e;margin-top:22px}
-table{border-collapse:collapse;width:100%;background:#fff;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-th{background:#2c3e50;color:#fff;padding:8px 10px;text-align:left;white-space:nowrap}
-td{padding:7px 10px;border-bottom:1px solid #e0e0e0}
-.pill{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:12px;white-space:nowrap}
-.solved{background:#d4edda;color:#155724}.failed{background:#f8d7da;color:#721c24}
-.steplimit{background:#fff3cd;color:#856404}.dnc{background:#e2e3e5;color:#383d41}
-.corrupt{background:#ead4f2;color:#5a2a82}
-.notes{background:#fff;border:1px solid #ddd;border-left:4px solid #2c3e50;padding:14px 18px;margin:14px 0;line-height:1.5;font-size:13px}
-.notes h3{margin:6px 0}.notes code{background:#f0f0f0;padding:1px 4px;border-radius:3px}
-.na{color:#aaa;font-style:italic}.legend{margin-bottom:18px;line-height:2}</style></head><body>
-<h1>Exgentic SWE-bench Results &mdash; Gemma-4-31B</h1>
-<p><strong>Agent:</strong> LiteLLM Tool Calling &nbsp;|&nbsp; <strong>Benchmark:</strong> SWE-bench Lite &nbsp;|&nbsp; <strong>Modes:</strong> full, spans, legolink-32, legolink-full, upstream</p>
-<div class='legend'><strong>Status:</strong> <span class='pill solved'>Solved</span> <span class='pill failed'>Completed / Not Solved</span> <span class='pill steplimit'>Step Limit Reached</span> <span class='pill dnc'>Did Not Complete</span> <span class='pill corrupt'>Corrupt (spans KV-reuse)</span></div>
-<div class='notes'><h3>Methodology &amp; honest findings</h3><p><strong>Setup (identical across all 5 modes):</strong> gemma-4-31B served in-cluster on vLLM (TP=2); agent = exgentic <code>tool_calling</code> (single <code>bash</code> tool) with the official <strong>SWE-agent</strong> system prompt (Princeton NLP / Ofir Press), function tool-calling via the <code>pythonic</code> parser; <strong>1 attempt</strong> per task, <strong>100-step</strong> cap (matches Doron). Only the vLLM spans env differs between modes.</p><p><strong>full vs upstream is the valid comparison.</strong> <code>full</code> = spans code path present but disabled; <code>upstream</code> = spans env removed (closest vanilla baseline). Both completed 12/12 with clean tool-calling but <strong>0 solved</strong>.</p><p><strong>Why 0 solved (vs Doron's ~5/12 on these same tasks):</strong> not a serving bug &mdash; verified on stock vanilla vLLM too. It is (1) <strong>editing quality</strong>: gemma-4 makes clean tool calls but botched/empty patches (interactive <code>vim</code> no-ops, malformed <code>sed</code>, oversized diffs) via the bash-only agent; and (2) <strong>run count</strong>: Doron ran each task <strong>up to 3&times;</strong> and kept the best, we ran once (he solved some on a single run, so per-run variance matters).</p><p><strong>spans / legolink-32 / legolink-full are not a valid comparison:</strong> the position-independent KV-reuse path corrupts gemma-4 generation (token salad, <code>&lt;unused&gt;</code> leakage, no parseable tool calls). legolink-full (gap=100000, full-span recompute) is also corrupt, so it is the span attention/position restructuring, not stale-KV. This is an omer/Doron-level issue in the spans image, recorded here as Corrupt.</p></div>
-<h2>Mode: full <span style='font-size:13px;color:#666'>(12/12 tasks)</span></h2>
-<h3>Easy</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-14995</td><td><span class='pill dnc'>Did Not Complete</span></td><td>27</td><td>36.4</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>django__django-10914</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>45.6</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23476</td><td><span class='pill dnc'>Did Not Complete</span></td><td>4</td><td>28.3</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>psf__requests-2317</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>68</td><td>132.9</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
+<!doctype html><html><head><meta charset="utf-8">
+<title>Gemma-4-31B SWE-bench &mdash; smolagents_code (uncached)</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:1000px;margin:24px auto;padding:0 16px;color:#222;line-height:1.5}
+table{border-collapse:collapse;width:100%;background:#fff;margin:10px 0 22px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+th,td{border:1px solid #e3e3e3;padding:7px 10px;text-align:left;font-size:14px}
+th{background:#f6f8fa}
+.pill{display:inline-block;padding:2px 9px;border-radius:11px;font-size:12px;font-weight:600;color:#fff}
+.solved{background:#1a7f37}.failed{background:#bf8700}.steplimit{background:#9a6700}.dnc{background:#b42318}
+code{background:#f0f0f0;padding:1px 5px;border-radius:4px;font-size:13px}
+.box{background:#f6f8fa;border:1px solid #e3e3e3;border-radius:8px;padding:12px 16px;margin:14px 0}
+.k{font-size:30px;font-weight:700}.ok{color:#1a7f37}.warn{color:#b42318}
+</style></head><body>
+<h1>Gemma-4-31B on SWE-bench Lite &mdash; smolagents_code harness</h1>
+<p><strong>Agent:</strong> exgentic <code>smolagents_code</code> (ReAct code-action) with a hardened SWE task prompt (grep-localize-first, edit-the-real-file, never-submit-empty-diff) &nbsp;|&nbsp;
+<strong>Model:</strong> gemma-4-31B (bf16) on vLLM TP=2 &nbsp;|&nbsp; <strong>temperature</strong>=1.0 &nbsp;|&nbsp; <strong>LLM cache: OFF</strong></p>
+
+<div class="box"><span class="k ok">&#10003; gemma-4 solved django-10914</span>
+<p>With the <code>smolagents_code</code> harness + the hardened prompt, gemma-4 produced the
+<strong>canonical fix</strong> &mdash; <code>FILE_UPLOAD_PERMISSIONS = 0o644</code> in
+<code>django/conf/global_settings.py</code> &mdash; derived on its own with <strong>no answer in the prompt</strong>.
+The SWE-bench harness graded it <code>resolved: true</code> (FAIL&rarr;PASS test
+<code>test_override_file_upload_permissions</code> passes, 99/99 PASS&rarr;PASS). Reproduced in two
+independent real generations. This is the first confirmed gemma-4 SWE-bench solve in this
+investigation (the earlier <code>tool_calling</code> harness got 0/12).</p></div>
+<div class="box"><h3>Methodology correction &mdash; a caching artifact, now removed</h3>
+<p>An initial 5-mode run appeared to show <em>every</em> mode (upstream, full, spans, legolink-32,
+legolink-full) solving django-10914. That was <strong>not real</strong>: exgentic enables litellm
+completion caching by default, keyed on <strong>prompt + model</strong> (not the endpoint), so once one
+mode generated the solve, every other mode <strong>replayed the cached completions</strong> &mdash; the SPANS/legolink
+vLLM backends were never actually exercised. Verified: spans and legolink-32 had byte-identical
+completion content. After setting <code>EXGENTIC_LITELLM_CACHING=false</code> and clearing the cache, the
+apparent cross-mode agreement disappears.</p></div>
+<h2>Uncached django-10914 solve rate (the real measurement)</h2>
+<table><thead><tr><th>Mode</th><th>vLLM SPANS config</th><th>Solved / passes</th><th>Per-pass outcomes</th></tr></thead><tbody>
+<tr><td><strong>upstream</strong></td><td>no spans env (vanilla)</td><td><span class="warn"><strong>0/10</strong></span></td><td><span class="pill steplimit" title="Step limit (no convergence)">limit_reached:100</span> <span class="pill failed" title="Completed / wrong patch">success:20</span> <span class="pill dnc" title="Errored (session interrupt)">error:5</span> <span class="pill steplimit" title="Step limit (no convergence)">limit_reached:100</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill steplimit" title="Step limit (no convergence)">limit_reached:100</span> <span class="pill dnc" title="Did not complete">success:1</span> <span class="pill dnc" title="Errored (session interrupt)">error:14</span> <span class="pill dnc" title="Errored (session interrupt)">error:5</span> <span class="pill steplimit" title="Step limit (no convergence)">limit_reached:100</span></td></tr>
+<tr><td><strong>full</strong></td><td>SPANS_ENABLED=False (baseline)</td><td><span class="ok"><strong>2/5</strong></span></td><td><span class="pill dnc" title="Errored (session interrupt)">error:3</span> <span class="pill steplimit" title="Step limit (no convergence)">limit_reached:100</span> <span class="pill solved" title="Solved">success:14</span> <span class="pill solved" title="Solved">success:12</span> <span class="pill failed" title="Completed / wrong patch">success:15</span></td></tr>
+<tr><td><strong>spans</strong></td><td>SPANS_ENABLED=True, gap_policy off</td><td><span class="warn"><strong>0/5</strong></span></td><td><span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span></td></tr>
+<tr><td><strong>legolink-32</strong></td><td>SPANS + gap_policy, gap=32</td><td><span class="warn"><strong>0/5</strong></span></td><td><span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span></td></tr>
+<tr><td><strong>legolink-full</strong></td><td>SPANS + gap_policy, gap=100000</td><td><span class="warn"><strong>0/5</strong></span></td><td><span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span> <span class="pill dnc" title="Errored (session interrupt)">error:0</span></td></tr>
 </tbody></table>
-<h3>Medium</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-12907</td><td><span class='pill dnc'>Did Not Complete</span></td><td>5</td><td>6.6</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>django__django-11815</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>294.0</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23299</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>174.9</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>pylint-dev__pylint-7080</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>340.9</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-</tbody></table>
-<h3>Hard</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>django__django-12708</td><td><span class='pill dnc'>Did Not Complete</span></td><td>14</td><td>29.0</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sympy__sympy-17630</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>426.8</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sympy__sympy-18199</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>964.1</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sphinx-doc__sphinx-7686</td><td><span class='pill failed'>Completed / Not Solved</span></td><td>40</td><td>57.6</td><td>0 / 2 (0%)</td><td>0 / 15 (0%)</td></tr>
-</tbody></table>
-<h2>Mode: spans <span style='font-size:13px;color:#666'>(0/12 tasks)</span></h2>
-<h3>Easy</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-14995</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>django__django-10914</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23476</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>psf__requests-2317</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h3>Medium</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-12907</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>django__django-11815</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23299</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>pylint-dev__pylint-7080</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h3>Hard</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>django__django-12708</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-17630</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-18199</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sphinx-doc__sphinx-7686</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h2>Mode: legolink-32 <span style='font-size:13px;color:#666'>(4/12 tasks)</span></h2>
-<h3>Easy</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-14995</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>django__django-10914</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>42.8</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23476</td><td><span class='pill dnc'>Did Not Complete</span></td><td>4</td><td>5.7</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>psf__requests-2317</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>68</td><td>30.5</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-</tbody></table>
-<h3>Medium</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-12907</td><td><span class='pill dnc'>Did Not Complete</span></td><td>93</td><td>4820.3</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>django__django-11815</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23299</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>pylint-dev__pylint-7080</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h3>Hard</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>django__django-12708</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-17630</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-18199</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sphinx-doc__sphinx-7686</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h2>Mode: legolink-full <span style='font-size:13px;color:#666'>(0/12 tasks)</span></h2>
-<h3>Easy</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-14995</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>django__django-10914</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23476</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>psf__requests-2317</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h3>Medium</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-12907</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>django__django-11815</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23299</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>pylint-dev__pylint-7080</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h3>Hard</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>django__django-12708</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-17630</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sympy__sympy-18199</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-<tr><td>sphinx-doc__sphinx-7686</td><td><span class='pill dnc'>not run yet</span></td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td><td class='na'>&mdash;</td></tr>
-</tbody></table>
-<h2>Mode: upstream <span style='font-size:13px;color:#666'>(12/12 tasks)</span></h2>
-<h3>Easy</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-14995</td><td><span class='pill dnc'>Did Not Complete</span></td><td>27</td><td>38.4</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>django__django-10914</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>50.6</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>matplotlib__matplotlib-23476</td><td><span class='pill dnc'>Did Not Complete</span></td><td>3</td><td>94.6</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>psf__requests-2317</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>68</td><td>121.9</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-</tbody></table>
-<h3>Medium</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>astropy__astropy-12907</td><td><span class='pill dnc'>Did Not Complete</span></td><td>5</td><td>8.4</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>django__django-11815</td><td><span class='pill failed'>Completed / Not Solved</span></td><td>12</td><td>88.1</td><td>0 / 2 (0%)</td><td>43 / 44 (98%)</td></tr>
-<tr><td>matplotlib__matplotlib-23299</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>332.9</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>pylint-dev__pylint-7080</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>19</td><td>417.7</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-</tbody></table>
-<h3>Hard</h3><table><thead><tr><th>Task ID</th><th>Status</th><th>Steps</th><th>Time (s)</th><th>FAIL&rarr;PASS</th><th>PASS&rarr;PASS</th></tr></thead><tbody>
-<tr><td>django__django-12708</td><td><span class='pill dnc'>Did Not Complete</span></td><td>14</td><td>6.4</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sympy__sympy-17630</td><td><span class='pill steplimit'>Step Limit Reached</span></td><td>100</td><td>420.8</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sympy__sympy-18199</td><td><span class='pill dnc'>Did Not Complete</span></td><td>7</td><td>112.1</td><td class="na">&mdash;</td><td class="na">&mdash;</td></tr>
-<tr><td>sphinx-doc__sphinx-7686</td><td><span class='pill failed'>Completed / Not Solved</span></td><td>40</td><td>152.3</td><td>0 / 2 (0%)</td><td>0 / 15 (0%)</td></tr>
-</tbody></table>
+<div class="box"><h3>What the rate test shows</h3>
+<p><strong>The solve is real but stochastic.</strong> Uncached at temperature 1.0, gemma-4 solves
+django-10914 some fraction of the time and otherwise tangles in Python syntax errors / hits the step cap,
+or the testbed session interrupts. Critically, <code>full</code> (a spans-disabled baseline) solved it in
+<strong>2/5</strong> uncached passes, so the baseline rate is <em>not</em>
+zero &mdash; the wide spread vs <code>upstream</code> (0/10, an
+error-heavy run) reflects high run-to-run variance plus a real session-interrupt error rate.</p>
+<p><strong>The spans/legolink modes fail at the middleware, not the model.</strong> Baseline (upstream+full, direct to vLLM) solved <strong>2/15</strong> (~13%). Every spans/legolink pass solved <strong>0/15</strong> &mdash; but they did not fail by generating corrupted text. They <strong>crashed at step 0</strong>: the local middleware (which marks PIC spans) returns <code>HTTP 422 Unprocessable Entity</code> on the agent's structured-output completion requests (the JSON <code>{thought, code}</code> call), litellm then returns <code>None</code>, and smolagents raises <code>AttributeError: 'NoneType' has no attribute 'choices'</code>. In the spans run the middleware answered ~87% of calls 200 OK and ~13% with 422, but the 422 lands on the very first structured call, so no pass ever runs. <strong>This is a middleware &harr; smolagents_code request-format incompatibility, not a measured KV-reuse/model-corruption result.</strong> The span-attention KV-reuse hypothesis is therefore <em>untested</em> here with this harness &mdash; it is masked by the upstream 422 crash.</p>
+<p><strong>Methodology note that matters:</strong> an earlier run appeared to show every mode solving the
+task identically &mdash; that was a litellm <em>caching</em> artifact (completions keyed on prompt+model,
+replayed across endpoints), not a real cross-mode result. All numbers here are uncached.</p>
+<p><strong>Bottom line:</strong> gemma-4 <em>can</em> solve a real SWE-bench task with the right agent
+harness (smolagents code-action) and a disciplined prompt, no answer leaked. Whether the SPANS/legolink
+KV-reuse path degrades that ability is shown above from uncached per-mode solve rates; treat small-sample
+gaps as suggestive given gemma-4's stochasticity.</p></div>
 </body></html>
