@@ -63,37 +63,39 @@ export class FileHandler {
         return raw.map(normalizeRecord);
     }
     extractRecords(trimmed) {
-        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            const parsed = JSON.parse(trimmed);
-            if (parsed.baseline && parsed.baseline.requests) {
-                return parsed.baseline.requests;
+        // First try the whole text as a single JSON value (object or array).
+        // This covers pretty-printed exports and the baseline/spans wrappers.
+        // It deliberately runs before the JSONL path because a JSONL file of
+        // objects also starts with '{' but is NOT one parseable JSON value.
+        const whole = tryParse(trimmed);
+        if (whole !== undefined) {
+            if (whole && whole.baseline && whole.baseline.requests) {
+                return whole.baseline.requests;
             }
-            else if (parsed.spans && parsed.spans.requests) {
-                return parsed.spans.requests;
+            else if (whole && whole.spans && whole.spans.requests) {
+                return whole.spans.requests;
             }
-            else if (parsed.requests && Array.isArray(parsed.requests)) {
-                return parsed.requests;
+            else if (whole && whole.requests && Array.isArray(whole.requests)) {
+                return whole.requests;
             }
-            else if (Array.isArray(parsed)) {
-                return parsed;
+            else if (Array.isArray(whole)) {
+                return whole;
             }
             else {
-                return [parsed];
+                return [whole];
             }
         }
-        else {
-            const lines = trimmed.split('\n').filter(line => line.trim());
-            const requests = [];
-            for (const line of lines) {
-                try {
-                    requests.push(JSON.parse(line));
-                }
-                catch (e) {
-                    console.warn('Failed to parse JSONL line:', line);
-                }
-            }
-            return requests.length > 0 ? requests : [JSON.parse(trimmed)];
+        // Otherwise treat it as JSONL: one JSON value per line.
+        const lines = trimmed.split('\n').filter(line => line.trim());
+        const requests = [];
+        for (const line of lines) {
+            const obj = tryParse(line);
+            if (obj !== undefined)
+                requests.push(obj);
+            else
+                console.warn('Failed to parse JSONL line:', line);
         }
+        return requests;
     }
     triggerFileInput(idx) {
         this.fileInput.dataset.target = String(idx);
@@ -101,6 +103,15 @@ export class FileHandler {
     }
     on(event, callback) {
         this.callbacks.set(event, callback);
+    }
+}
+/** JSON.parse that returns undefined instead of throwing on invalid input. */
+function tryParse(text) {
+    try {
+        return JSON.parse(text);
+    }
+    catch {
+        return undefined;
     }
 }
 /**
