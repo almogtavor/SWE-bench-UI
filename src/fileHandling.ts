@@ -1,4 +1,5 @@
 import { Request } from './utils.js';
+import { alertModal } from './modal.js';
 
 export type FileCallback = (idx: number, requests: Request[], fileName: string, rawText: string) => void;
 
@@ -60,7 +61,7 @@ export class FileHandler {
                 callback(idx, parsed, file.name, text);
             }
         } catch (error) {
-            alert(`Error loading file: ${error instanceof Error ? error.message : String(error)}`);
+            alertModal(`Error loading file: ${error instanceof Error ? error.message : String(error)}`, 'Load error');
         }
     }
 
@@ -148,10 +149,14 @@ function normalizeRecord(obj: any): Request {
     }));
 
     const reply = extractAssistantContent(obj.response);
+    const rawChoice = obj.response && Array.isArray(obj.response.choices) && typeof obj.response.choices[0] === 'string'
+        ? obj.response.choices[0]
+        : '';
 
     return {
         ...obj,
         _session: true,
+        _rawChoice: rawChoice,
         messages,
         response: reply !== '' ? reply : obj.response,
         prompt_tokens: obj.prompt_tokens,

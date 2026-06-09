@@ -1,6 +1,7 @@
 // Local, browser-only library of past uploads. Everything lives in
 // localStorage so a user's traces and the folders they organise them into
 // survive page reloads without any backend.
+import { confirmModal, promptModal, alertModal } from './modal.js';
 const STORAGE_KEY = 'swebench-ui-library';
 function newId() {
     const c = globalThis.crypto;
@@ -34,7 +35,7 @@ export class LibraryStore {
             return true;
         }
         catch (e) {
-            alert('Could not save to local storage (it may be full). Delete some uploads and try again.');
+            alertModal('Could not save to local storage (it may be full). Delete some uploads and try again.', 'Storage full');
             return false;
         }
     }
@@ -300,19 +301,19 @@ export class Sidebar {
             this.expanded.add(targetFolderId);
         this.render();
     }
-    newFolder(parentId) {
-        const name = prompt('Folder name:', 'New folder');
-        if (!name)
+    async newFolder(parentId) {
+        const name = await promptModal('Folder name:', 'New folder', 'New folder');
+        if (!name || !name.trim())
             return;
         this.store.createFolder(name.trim(), parentId);
         if (parentId)
             this.expanded.add(parentId);
         this.render();
     }
-    renameItem(kind, id) {
+    async renameItem(kind, id) {
         const current = kind === 'folder' ? this.findFolderName(id) : this.store.getUpload(id)?.name;
-        const name = prompt('Rename to:', current || '');
-        if (!name)
+        const name = await promptModal('Rename to:', current || '', 'Rename');
+        if (!name || !name.trim())
             return;
         if (kind === 'folder')
             this.store.renameFolder(id, name.trim());
@@ -333,17 +334,16 @@ export class Sidebar {
         };
         return walk(null)?.name;
     }
-    deleteItem(kind, id) {
-        if (kind === 'folder') {
-            if (!confirm('Delete this folder and everything inside it?'))
-                return;
+    async deleteItem(kind, id) {
+        const msg = kind === 'folder'
+            ? 'Delete this folder and everything inside it?'
+            : 'Delete this upload?';
+        if (!(await confirmModal(msg, 'Delete')))
+            return;
+        if (kind === 'folder')
             this.store.deleteFolder(id);
-        }
-        else {
-            if (!confirm('Delete this upload?'))
-                return;
+        else
             this.store.deleteUpload(id);
-        }
         this.render();
     }
     toggleFolder(id) {

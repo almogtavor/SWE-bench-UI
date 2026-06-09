@@ -1,4 +1,6 @@
 import { escapeHtml, getResolvedStatus, getStatusColor, getStatusText, Request } from './utils.js';
+import { renderMarkdown, highlightCode } from './markdown.js';
+import { parseChoiceRepr } from './litellm.js';
 
 export interface Dump {
     name: string;
@@ -13,12 +15,14 @@ type Event =
     | { kind: 'system'; text: string }
     | { kind: 'user'; text: string }
     | { kind: 'observation'; text: string }
-    | { kind: 'step'; label: string; tokens: string; action: string };
+    | { kind: 'step'; label: string; tokens: string; action: string; rawChoice: string };
 
 export class UI {
     private container: HTMLElement;
     private maxDumps: number;
     private callbacks: Map<string, Function> = new Map();
+    private parse = true; // render markdown + highlight code (toggleable)
+    private parseApi = false; // parse raw litellm Choices() reprs into tool-call cards
 
     constructor(containerId: string, maxDumps: number = 4) {
         const el = document.getElementById(containerId);
@@ -27,6 +31,11 @@ export class UI {
         this.container = el;
         this.maxDumps = maxDumps;
     }
+
+    getParse(): boolean { return this.parse; }
+    setParse(on: boolean): void { this.parse = on; }
+    getParseApi(): boolean { return this.parseApi; }
+    setParseApi(on: boolean): void { this.parseApi = on; }
 
     renderDumps(dumps: Dump[]): void {
         this.container.innerHTML = dumps.map((dump, idx) => {
@@ -65,7 +74,6 @@ export class UI {
                     this.renderRequest(idx, 0, dump.requests[0]);
                 }
             }
-            this.setupDropZone(idx);
         });
     }
 
@@ -86,30 +94,27 @@ export class UI {
             <span>${fmt(totalP)} in / ${fmt(totalC)} out tokens</span>
         </div><div class="chat">`;
 
+        const parse = this.parse;
+        const parseApi = this.parseApi;
         for (let i = 0; i < events.length; i++) {
             const ev = events[i];
             if (ev.kind === 'system') {
-                html += `<details class="msg system"><summary>⚙ System prompt (${fmt(ev.text.length)} chars)</summary><pre class="code">${escapeHtml(ev.text)}</pre></details>`;
+                html += sysBlock(ev.text);
             } else if (ev.kind === 'user') {
-                html += msgRow('user', '👤 User', `<div class="msg-text">${escapeHtml(ev.text)}</div>`);
+                html += msgRow('user', '👤 User', textBox(ev.text, parse));
             } else if (ev.kind === 'observation') {
-                html += toolCard('Output', '', ev.text, 'out-only');
+                html += toolCard('Output', '', ev.text, 'out-only', parse);
             } else if (ev.kind === 'step') {
-                const action = parseAction(ev.action);
-                let inner = '';
-                if (action.thought) inner += `<div class="msg-text">${escapeHtml(action.thought)}</div>`;
-                if (action.code) {
-                    // Pair the code with the observation that immediately follows it.
-                    let out: string | null = null;
-                    if (i + 1 < events.length && events[i + 1].kind === 'observation') {
-                        out = (events[i + 1] as { text: string }).text;
-                        i++;
-                    }
-                    inner += toolCard('Code', action.code, out, out === null ? 'in-only' : '');
+                // The observation that immediately follows this step (if any) is
+                // the tool/code result; pair it into the step's tool card.
+                let out: string | null = null;
+                if (i + 1 < events.length && events[i + 1].kind === 'observation') {
+                    out = (events[i + 1] as { text: string }).text;
+                    i++;
                 }
-                if (!action.thought && !action.code) {
-                    inner += `<div class="msg-text">${escapeHtml(ev.action)}</div>`;
-                }
+                const inner = parseApi && ev.rawChoice
+                    ? renderApiStep(ev.rawChoice, ev.action, out, parse)
+                    : renderSmolStep(ev.action, out, parse);
                 html += `<div class="step-div"><span>${escapeHtml(ev.label)}${ev.tokens ? ' · ' + ev.tokens : ''}</span></div>`;
                 html += msgRow('assistant', '🤖 Assistant', inner);
             }
@@ -134,6 +139,7 @@ export class UI {
         const contentEl = document.getElementById(`content-${dumpIdx}`);
         if (!contentEl || !req) return;
 
+        const parse = this.parse;
         let html = '<div class="chat">';
         if (req.messages && Array.isArray(req.messages)) {
             req.messages.forEach(msg => {
@@ -141,17 +147,17 @@ export class UI {
                 const label = role === 'user' ? '👤 User' : role === 'assistant' ? '🤖 Assistant' : '⚙ ' + role;
                 const content = typeof msg.content === 'string' ? msg.content : '';
                 if (role === 'system') {
-                    html += `<details class="msg system"><summary>⚙ System prompt (${fmt(content.length)} chars)</summary><pre class="code">${escapeHtml(content)}</pre></details>`;
+                    html += sysBlock(content);
                 } else {
-                    html += msgRow(role, label, `<div class="msg-text">${escapeHtml(content)}</div>`);
+                    html += msgRow(role, label, textBox(content, parse));
                 }
             });
         } else if (req.prompt) {
-            html += msgRow('user', '👤 Input', `<div class="msg-text">${escapeHtml(req.prompt)}</div>`);
+            html += msgRow('user', '👤 Input', textBox(req.prompt, parse));
         }
         if (req.response) {
             const r = typeof req.response === 'string' ? req.response : JSON.stringify(req.response, null, 2);
-            html += msgRow('assistant', '🤖 Response', `<div class="msg-text">${escapeHtml(r)}</div>`);
+            html += msgRow('assistant', '🤖 Response', textBox(r, parse));
         }
         html += '</div>';
 
@@ -160,21 +166,6 @@ export class UI {
             html += `<div class="status-badge" style="border-left: 3px solid ${getStatusColor(resolved)};"><strong>${getStatusText(resolved)}</strong></div>`;
         }
         contentEl.innerHTML = html;
-    }
-
-    private setupDropZone(idx: number): void {
-        const dropZone = document.getElementById(`dropZone-${idx}`);
-        if (!dropZone) return;
-
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-        });
     }
 
     editDumpName(idx: number, dumps: Dump[]): void {
@@ -237,7 +228,7 @@ function reconstructEvents(requests: Request[]): Event[] {
         const tokens = req.prompt_tokens != null
             ? `${fmt(req.prompt_tokens)}→${fmt(req.completion_tokens || 0)} tok`
             : '';
-        events.push({ kind: 'step', label: `R${i + 1}`, tokens, action: action || '' });
+        events.push({ kind: 'step', label: `R${i + 1}`, tokens, action: action || '', rawChoice: req._rawChoice || '' });
 
         shown = msgs;
     });
@@ -267,6 +258,43 @@ function parseAction(text: string): { thought: string; code: string } {
     return { thought: '', code: '' };
 }
 
+/** Default rendering of a model step: smolagents thought + code, else text. */
+function renderSmolStep(actionText: string, out: string | null, parse: boolean): string {
+    const action = parseAction(actionText);
+    let inner = '';
+    if (action.thought) inner += textBox(action.thought, parse);
+    if (action.code) inner += toolCard('Code', action.code, out, out === null ? 'in-only' : '', parse);
+    if (!action.thought && !action.code) {
+        inner += textBox(actionText, parse);
+        if (out != null) inner += toolCard('Output', '', out, 'out-only', parse);
+    }
+    return inner;
+}
+
+/** "Parse API" rendering: turn a raw litellm Choices() repr into tool cards. */
+function renderApiStep(rawChoice: string, actionText: string, out: string | null, parse: boolean): string {
+    const parsed = parseChoiceRepr(rawChoice);
+    let inner = '';
+
+    // Content may itself be a smolagents thought/code action.
+    if (parsed.content) inner += renderSmolStep(parsed.content, parsed.toolCalls.length ? null : out, parse);
+
+    parsed.toolCalls.forEach((tc, idx) => {
+        const isLast = idx === parsed.toolCalls.length - 1;
+        const cardOut = isLast ? out : null;
+        inner += toolCard(`🔧 ${tc.name || 'tool'}`, tc.arguments, cardOut, cardOut === null ? 'in-only' : '', parse, 'json');
+    });
+
+    if (parsed.finishReason) {
+        inner += `<div class="finish-tag">finish_reason: ${escapeHtml(parsed.finishReason)}</div>`;
+    }
+    if (!parsed.content && !parsed.toolCalls.length) {
+        // Could not parse anything meaningful; fall back to the default view.
+        inner = renderSmolStep(actionText, out, parse);
+    }
+    return inner;
+}
+
 function msgRow(role: string, label: string, innerHtml: string): string {
     return `<div class="msg ${role}">
         <div class="msg-rail"><span class="dot"></span></div>
@@ -274,9 +302,23 @@ function msgRow(role: string, label: string, innerHtml: string): string {
     </div>`;
 }
 
-function toolCard(head: string, inText: string, outText: string | null, mod: string): string {
+/** A text block: markdown-rendered when parse is on, plain pre-wrap otherwise. */
+function textBox(text: string, parse: boolean): string {
+    if (!text) return '';
+    return parse
+        ? `<div class="md">${renderMarkdown(text)}</div>`
+        : `<div class="msg-text">${escapeHtml(text)}</div>`;
+}
+
+/** Collapsible system prompt card (always preformatted to keep its layout). */
+function sysBlock(text: string): string {
+    return `<details class="sys-block"><summary>⚙ System prompt · ${fmt(text.length)} chars</summary><pre class="code">${escapeHtml(text)}</pre></details>`;
+}
+
+function toolCard(head: string, inText: string, outText: string | null, mod: string, parse: boolean, lang = 'python'): string {
+    const inHtml = parse ? highlightCode(inText, lang) : escapeHtml(inText);
     let html = `<div class="tool-card ${mod}"><div class="tool-head">${escapeHtml(head)}</div>`;
-    if (inText) html += `<div class="tool-io in"><span class="io-tag">IN</span><pre class="code">${escapeHtml(inText)}</pre></div>`;
+    if (inText) html += `<div class="tool-io in"><span class="io-tag">IN</span><pre class="code">${inHtml}</pre></div>`;
     if (outText != null) html += `<div class="tool-io out"><span class="io-tag">OUT</span><pre class="code">${escapeHtml(outText)}</pre></div>`;
     html += '</div>';
     return html;

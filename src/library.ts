@@ -2,6 +2,8 @@
 // localStorage so a user's traces and the folders they organise them into
 // survive page reloads without any backend.
 
+import { confirmModal, promptModal, alertModal } from './modal.js';
+
 export interface LibFolder {
     id: string;
     name: string;
@@ -56,7 +58,7 @@ export class LibraryStore {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
             return true;
         } catch (e) {
-            alert('Could not save to local storage (it may be full). Delete some uploads and try again.');
+            alertModal('Could not save to local storage (it may be full). Delete some uploads and try again.', 'Storage full');
             return false;
         }
     }
@@ -331,18 +333,18 @@ export class Sidebar {
         this.render();
     }
 
-    private newFolder(parentId: string | null): void {
-        const name = prompt('Folder name:', 'New folder');
-        if (!name) return;
+    private async newFolder(parentId: string | null): Promise<void> {
+        const name = await promptModal('Folder name:', 'New folder', 'New folder');
+        if (!name || !name.trim()) return;
         this.store.createFolder(name.trim(), parentId);
         if (parentId) this.expanded.add(parentId);
         this.render();
     }
 
-    private renameItem(kind: 'folder' | 'upload', id: string): void {
+    private async renameItem(kind: 'folder' | 'upload', id: string): Promise<void> {
         const current = kind === 'folder' ? this.findFolderName(id) : this.store.getUpload(id)?.name;
-        const name = prompt('Rename to:', current || '');
-        if (!name) return;
+        const name = await promptModal('Rename to:', current || '', 'Rename');
+        if (!name || !name.trim()) return;
         if (kind === 'folder') this.store.renameFolder(id, name.trim());
         else this.store.renameUpload(id, name.trim());
         this.render();
@@ -360,14 +362,13 @@ export class Sidebar {
         return walk(null)?.name;
     }
 
-    private deleteItem(kind: 'folder' | 'upload', id: string): void {
-        if (kind === 'folder') {
-            if (!confirm('Delete this folder and everything inside it?')) return;
-            this.store.deleteFolder(id);
-        } else {
-            if (!confirm('Delete this upload?')) return;
-            this.store.deleteUpload(id);
-        }
+    private async deleteItem(kind: 'folder' | 'upload', id: string): Promise<void> {
+        const msg = kind === 'folder'
+            ? 'Delete this folder and everything inside it?'
+            : 'Delete this upload?';
+        if (!(await confirmModal(msg, 'Delete'))) return;
+        if (kind === 'folder') this.store.deleteFolder(id);
+        else this.store.deleteUpload(id);
         this.render();
     }
 

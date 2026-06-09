@@ -25,9 +25,9 @@ python -m http.server 8000
 
 1. Click "+ Add Dump" to add evaluation result dumps (up to 4)
 2. Drag a JSON/JSONL dump file onto a panel or click to browse
-3. Double-click dump names to customize labels
-4. Click request buttons (R1, R2, etc) to view individual traces
-5. Toggle dark/light mode with the 🌙 button
+3. LiteLLM traces render as one conversation; flat exports show R1, R2... task tabs
+4. Use ✨ Parsed for markdown/highlighting and 🧩 Parse API for tool-call decoding
+5. Saved uploads appear in the left library, drag them into folders to organize
 
 ## Supported Formats
 
@@ -38,12 +38,12 @@ python -m http.server 8000
 
 ## Features
 
-- Multi-dump support (up to 4 concurrent dumps)
-- Generic interface (works with any SWE bench format)
-- Customizable dump names
-- Side-by-side request comparison
-- Dark/light mode toggle
-- Drag-and-drop file upload
+- LiteLLM trace.jsonl stitched into one scrollable conversation (per-call steps, thought + code IN/OUT, collapsible system prompt)
+- Markdown rendering with Python/JSON syntax highlighting (toggleable)
+- "Parse API" mode: decode raw litellm/OpenAI `Choices()` reprs into readable tool-call cards
+- Local library sidebar: uploads saved in your browser and organized into folders
+- Side-by-side comparison of up to 4 dumps
+- Works with any SWE bench export (JSON, JSONL, baseline/SPANS)
 
 ## License
 

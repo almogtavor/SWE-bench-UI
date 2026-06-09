@@ -4,19 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SWE-bench-UI</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div class="theme-toggle" id="themeToggle">🌙</div>
-
     <div class="app-layout">
         <aside class="sidebar" id="sidebar"></aside>
 
         <div class="container">
             <header>
-                <h1>SWE-bench-UI</h1>
+                <div class="brand" onclick="window.app.goHome()" title="Back to start">
+                    <img src="logo.png" alt="SWE-bench-UI" class="app-logo">
+                    <h1>SWE-bench-UI</h1>
+                </div>
                 <p>Compare SWE bench evaluation results</p>
-                <button class="add-dump-btn" onclick="window.app.addDump()">+ Add Dump</button>
+                <div class="header-actions">
+                    <button class="toggle-btn" id="parseToggle" onclick="window.app.toggleParse()" title="Render markdown and highlight code">✨ Parsed</button>
+                    <button class="toggle-btn off" id="parseApiToggle" onclick="window.app.toggleParseApi()" title="Parse raw litellm/OpenAI Choices() into tool calls">🧩 Parse API</button>
+                    <button class="add-dump-btn" onclick="window.app.addDump()">+ Add Dump</button>
+                    <div class="theme-toggle" id="themeToggle">🌙</div>
+                </div>
             </header>
 
             <div class="dumps-container" id="dumpsContainer"></div>

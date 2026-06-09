@@ -1,3 +1,4 @@
+import { alertModal } from './modal.js';
 export class FileHandler {
     constructor(fileInputId) {
         this.callbacks = new Map();
@@ -48,7 +49,7 @@ export class FileHandler {
             }
         }
         catch (error) {
-            alert(`Error loading file: ${error instanceof Error ? error.message : String(error)}`);
+            alertModal(`Error loading file: ${error instanceof Error ? error.message : String(error)}`, 'Load error');
         }
     }
     /** Parse raw JSON/JSONL text into renderable requests (used for re-opening saved uploads too). */
@@ -132,9 +133,13 @@ function normalizeRecord(obj) {
         content: flattenContent(m.content),
     }));
     const reply = extractAssistantContent(obj.response);
+    const rawChoice = obj.response && Array.isArray(obj.response.choices) && typeof obj.response.choices[0] === 'string'
+        ? obj.response.choices[0]
+        : '';
     return {
         ...obj,
         _session: true,
+        _rawChoice: rawChoice,
         messages,
         response: reply !== '' ? reply : obj.response,
         prompt_tokens: obj.prompt_tokens,

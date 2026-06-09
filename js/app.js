@@ -2,6 +2,7 @@ import { ThemeManager } from './theme.js';
 import { FileHandler } from './fileHandling.js';
 import { UI } from './ui.js';
 import { LibraryStore, Sidebar } from './library.js';
+import { alertModal } from './modal.js';
 class App {
     constructor() {
         this.maxDumps = 4;
@@ -19,15 +20,44 @@ class App {
         this.fileHandler.on('onFileLoaded', (idx, requests, fileName, rawText) => {
             this.onFileLoaded(idx, requests, fileName, rawText);
         });
+        // Stop the browser from navigating away when a file is dropped outside a panel.
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => e.preventDefault());
         this.sidebar.render();
         this.setupInitialDump();
+    }
+    /** Reset the comparison area back to a single empty panel (the home view). */
+    goHome() {
+        this.dumps = [];
+        this.currentRequest = 0;
+        this.addDump();
+    }
+    toggleParse() {
+        const on = !this.ui.getParse();
+        this.ui.setParse(on);
+        const btn = document.getElementById('parseToggle');
+        if (btn) {
+            btn.textContent = on ? '✨ Parsed' : '🅰 Raw';
+            btn.classList.toggle('off', !on);
+        }
+        this.render();
+    }
+    toggleParseApi() {
+        const on = !this.ui.getParseApi();
+        this.ui.setParseApi(on);
+        const btn = document.getElementById('parseApiToggle');
+        if (btn) {
+            btn.textContent = on ? '🧩 API parsed' : '🧩 Parse API';
+            btn.classList.toggle('off', !on);
+        }
+        this.render();
     }
     setupInitialDump() {
         this.addDump();
     }
     addDump() {
         if (this.dumps.length >= this.maxDumps) {
-            alert(`Maximum ${this.maxDumps} dumps allowed`);
+            alertModal(`Maximum ${this.maxDumps} dumps allowed`, 'Limit reached');
             return;
         }
         const idx = this.dumps.length;
@@ -80,13 +110,15 @@ class App {
             this.dumps[idx].name = upload.name.replace(/\.[^/.]+$/, '');
         }
         catch (e) {
-            alert(`Could not open ${upload.name}: ${e instanceof Error ? e.message : String(e)}`);
+            alertModal(`Could not open ${upload.name}: ${e instanceof Error ? e.message : String(e)}`, 'Open failed');
             return;
         }
         this.render();
     }
     render() {
         this.ui.renderDumps(this.dumps);
+        // Wire each panel's drop zone so dropping a file actually loads it.
+        this.dumps.forEach((_, idx) => this.fileHandler.setupDropZone(idx, `dropZone-${idx}`));
     }
 }
 window.app = new App();
