@@ -15,9 +15,16 @@ export function getResolvedStatus(req) {
                 null;
 }
 export function getStatusColor(resolved) {
-    return resolved ? '#10b981' : '#ef4444';
+    return resolved === null ? '#8b949e' : resolved ? '#10b981' : '#ef4444';
 }
 export function getStatusText(resolved) {
-    return resolved ? '✅ PASS' : '❌ FAIL';
+    return resolved === null ? 'ungraded' : resolved ? '1/1 resolved' : '0/1 resolved';
+}
+/** A clear pass/fail/ungraded pill, e.g. "🟢 1/1" / "🔴 0/1" / "⚪ ungraded". */
+export function statusPill(req) {
+    const r = getResolvedStatus(req);
+    const cls = r === null ? 'ungraded' : r ? 'pass' : 'fail';
+    const label = r === null ? '⚪ ungraded' : r ? '🟢 1/1' : '🔴 0/1';
+    return `<span class="status-pill ${cls}">${label}</span>`;
 }
 //# sourceMappingURL=utils.js.map

@@ -1,4 +1,4 @@
-import { escapeHtml, getResolvedStatus, getStatusColor, getStatusText } from './utils.js';
+import { escapeHtml, getResolvedStatus, getStatusColor, getStatusText, statusPill } from './utils.js';
 import { renderMarkdown, highlightCode } from './markdown.js';
 import { parseChoiceRepr } from './litellm.js';
 export class UI {
@@ -44,10 +44,13 @@ export class UI {
         dumps.forEach((dump, idx) => {
             if (dump.requests.length > 0) {
                 if (isSession(dump.requests)) {
-                    this.renderConversation(idx, dump.requests);
+                    if (dump.requests[0]._kind === 'trajectory')
+                        this.renderTrajectory(idx, dump.requests);
+                    else
+                        this.renderConversation(idx, dump.requests);
                 }
                 else {
-                    this.renderNav(idx, dump.requests.length);
+                    this.renderNav(idx, dump.requests);
                     this.renderRequest(idx, 0, dump.requests[0]);
                 }
             }
@@ -63,6 +66,7 @@ export class UI {
         const totalC = sum(requests.map(r => r.completion_tokens));
         const model = requests.find(r => r.model)?.model || '';
         let html = `<div class="session-summary">
+            ${statusPill(sessionGrade(requests))}
             ${model ? `<span class="pill">${escapeHtml(model)}</span>` : ''}
             <span>${requests.length} call${requests.length === 1 ? '' : 's'}</span>
             <span>${fmt(totalP)} in / ${fmt(totalC)} out tokens</span>
@@ -98,21 +102,69 @@ export class UI {
         html += '</div>';
         el.innerHTML = html;
     }
+    // ---- Trajectory view: action/observation tool-calling log ----
+    renderTrajectory(dumpIdx, recs) {
+        const el = document.getElementById(`content-${dumpIdx}`);
+        if (!el)
+            return;
+        const parse = this.parse;
+        const taskId = recs.find(r => r.task_id)?.task_id || '';
+        const cost = recs.reduce((a, r) => a + (r.agent_cost || 0) + (r.benchmark_cost || 0), 0);
+        // Pre-build the visible steps so the summary count matches what we draw.
+        const steps = [];
+        for (let i = 0; i < recs.length; i++) {
+            const r = recs[i];
+            if (r.event !== 'action')
+                continue; // observations attach to their action below
+            const a = r.action || {};
+            const args = parseArgs(a.arguments);
+            const obs = recs[i + 1] && recs[i + 1].event === 'observation' ? recs[i + 1].observation : undefined;
+            const out = obs && obs.result != null ? formatResult(obs.result) : null;
+            let inner = '';
+            if (a.name === 'message') {
+                const content = String(args.content ?? '');
+                if (!content.trim())
+                    continue; // skip empty agent messages
+                inner = textBox(content, parse);
+            }
+            else if (a.name === 'bash') {
+                inner = toolCard('bash', String(args.command ?? ''), out, out === null ? 'in-only' : '', parse, 'bash');
+            }
+            else {
+                const argText = typeof a.arguments === 'string' ? a.arguments : JSON.stringify(a.arguments, null, 2);
+                inner = toolCard(`🔧 ${a.name || 'tool'}`, argText, out, out === null ? 'in-only' : '', parse, 'json');
+            }
+            const div = `<div class="step-div"><span>Step ${steps.length + 1}${a.name ? ' · ' + escapeHtml(a.name) : ''}</span></div>`;
+            steps.push(div + msgRow('assistant', '🤖 Assistant', inner));
+        }
+        const html = `<div class="session-summary">
+            ${statusPill(sessionGrade(recs))}
+            ${taskId ? `<span class="pill">${escapeHtml(taskId)}</span>` : ''}
+            <span>${steps.length} step${steps.length === 1 ? '' : 's'}</span>
+            ${cost ? `<span>$${cost.toFixed(4)} cost</span>` : ''}
+        </div><div class="chat">${steps.join('')}</div>`;
+        el.innerHTML = html;
+    }
     // ---- Multi-instance view (each record is a separate task): keep tabs ----
-    renderNav(dumpIdx, requestCount) {
+    renderNav(dumpIdx, requests) {
         const nav = document.getElementById(`nav-${dumpIdx}`);
         if (!nav)
             return;
-        nav.innerHTML = Array.from({ length: requestCount }, (_, i) => `
-            <button class="req-btn ${i === 0 ? 'active' : ''}" onclick="window.app.selectRequest(${i}, ${dumpIdx})">R${i + 1}</button>
-        `).join('');
+        nav.innerHTML = requests.map((req, i) => {
+            const r = getResolvedStatus(req);
+            const mark = r === null ? '' : r ? '🟢' : '🔴';
+            const cls = r === null ? '' : r ? 'pass' : 'fail';
+            return `<button class="req-btn ${cls} ${i === 0 ? 'active' : ''}" onclick="window.app.selectRequest(${i}, ${dumpIdx})">${mark} R${i + 1}</button>`;
+        }).join('');
     }
     renderRequest(dumpIdx, reqIdx, req) {
         const contentEl = document.getElementById(`content-${dumpIdx}`);
         if (!contentEl || !req)
             return;
         const parse = this.parse;
-        let html = '<div class="chat">';
+        const taskId = req.task_id || req.instance_id || '';
+        let html = `<div class="session-summary">${statusPill(req)}${taskId ? `<span class="pill">${escapeHtml(taskId)}</span>` : ''}</div>`;
+        html += '<div class="chat">';
         if (req.messages && Array.isArray(req.messages)) {
             req.messages.forEach(msg => {
                 const role = msg.role || 'unknown';
@@ -264,6 +316,45 @@ function msgRow(role, label, innerHtml) {
         <div class="msg-rail"><span class="dot"></span></div>
         <div class="msg-body"><div class="msg-role">${label}</div>${innerHtml}</div>
     </div>`;
+}
+/** Pick the record that carries a resolved/success grade (if any) for the pill. */
+function sessionGrade(reqs) {
+    for (const r of reqs) {
+        if (r.resolved !== undefined || r.success !== undefined || r.test_result !== undefined)
+            return r;
+    }
+    return {};
+}
+/** Render a trajectory observation result (usually {output, returncode}). */
+function formatResult(result) {
+    if (result == null)
+        return '';
+    if (typeof result === 'string')
+        return result;
+    if (typeof result === 'object') {
+        const o = result;
+        if (typeof o.output === 'string') {
+            return o.returncode != null ? `${o.output}\n[exit ${o.returncode}]` : o.output;
+        }
+        return JSON.stringify(result, null, 2);
+    }
+    return String(result);
+}
+/** Tool-call arguments may be a JSON string or an object. */
+function parseArgs(a) {
+    if (a == null)
+        return {};
+    if (typeof a === 'object')
+        return a;
+    if (typeof a === 'string') {
+        try {
+            return JSON.parse(a);
+        }
+        catch {
+            return { _raw: a };
+        }
+    }
+    return {};
 }
 /** A text block: markdown-rendered when parse is on, plain pre-wrap otherwise. */
 function textBox(text, parse) {

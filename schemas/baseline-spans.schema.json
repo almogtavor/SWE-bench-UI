@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://almogtavor.github.io/SWE-bench-UI/schemas/baseline-spans.schema.json",
+  "title": "Baseline / SPANS nested export",
+  "description": "A single JSON object that wraps a list of request records under baseline.requests, spans.requests, or a top-level requests array. The viewer unwraps it and renders the inner records.",
+  "type": "object",
+  "anyOf": [
+    { "required": ["baseline"] },
+    { "required": ["spans"] },
+    { "required": ["requests"] }
+  ],
+  "properties": {
+    "baseline": {
+      "type": "object",
+      "properties": { "requests": { "type": "array", "items": { "type": "object" } } }
+    },
+    "spans": {
+      "type": "object",
+      "properties": { "requests": { "type": "array", "items": { "type": "object" } } }
+    },
+    "requests": {
+      "type": "array",
+      "description": "Each item follows the SWE-bench flat record shape.",
+      "items": { "type": "object" }
+    }
+  }
+}

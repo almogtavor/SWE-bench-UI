@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://almogtavor.github.io/SWE-bench-UI/schemas/swebench-flat.schema.json",
+  "title": "SWE-bench flat export record",
+  "description": "One record per task instance, as a JSON array or as JSONL. Each record is shown as its own R1, R2... tab with a resolved badge (🟢 1/1 / 🔴 0/1).",
+  "type": "object",
+  "properties": {
+    "instance_id": { "type": "string", "description": "e.g. \"astropy__astropy-14995\"." },
+    "task_id": { "type": "string" },
+    "resolved": { "type": "boolean", "description": "Whether the patch resolved the issue. Drives the badge." },
+    "success": { "type": "boolean", "description": "Fallback grade when \"resolved\" is absent." },
+    "test_result": { "type": "string", "description": "Fallback grade: \"passed\" counts as resolved." },
+    "model_name_or_path": { "type": "string" },
+    "model_patch": { "type": "string" },
+    "patch_valid": { "type": "boolean" },
+    "prompt": { "type": "string" },
+    "response": { "type": ["string", "object"] },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string" },
+          "content": { "type": ["string", "array"] }
+        }
+      }
+    },
+    "prompt_tokens": { "type": "integer" },
+    "completion_tokens": { "type": "integer" },
+    "latency_seconds": { "type": "number" }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://almogtavor.github.io/SWE-bench-UI/schemas/trajectory.schema.json",
+  "title": "Trajectory.jsonl event record",
+  "description": "One JSON object per line. An agent run as an alternating stream of action and observation events. The viewer renders each action as a step (bash command, message, or generic tool call) and attaches the following observation as its output.",
+  "type": "object",
+  "required": ["event"],
+  "properties": {
+    "event": { "type": "string", "enum": ["action", "observation"] },
+    "step": { "type": "integer" },
+    "task_id": { "type": "string" },
+    "run_id": { "type": "string" },
+    "session_id": { "type": "string" },
+    "session_number": { "type": "integer" },
+    "initial": { "type": ["boolean", "string"] },
+    "agent_cost": { "type": "number" },
+    "benchmark_cost": { "type": "number" },
+    "action": {
+      "type": "object",
+      "description": "Present when event == \"action\". A tool call.",
+      "properties": {
+        "name": { "type": "string", "description": "e.g. \"bash\", \"message\", or any tool name." },
+        "arguments": {
+          "description": "JSON string or object. bash -> {command}; message -> {content}.",
+          "type": ["string", "object"]
+        },
+        "id": { "type": "string" },
+        "validation": { "type": ["string", "object", "null"] }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "description": "Present when event == \"observation\". The result of the preceding action.",
+      "properties": {
+        "result": {
+          "description": "Tool output. For bash: {output:string, returncode:int}. null on the initial observation.",
+          "type": ["object", "string", "null"]
+        },
+        "invoking_actions": { "type": "array" }
+      }
+    }
+  }
+}

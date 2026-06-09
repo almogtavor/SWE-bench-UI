@@ -135,6 +135,14 @@ function tryParse(text: string): any {
  * that shape and leave any other record untouched.
  */
 function normalizeRecord(obj: any): Request {
+    // Trajectory event log: alternating action / observation records.
+    const isTrajectory = obj && typeof obj === 'object'
+        && (obj.event === 'action' || obj.event === 'observation')
+        && ('action' in obj || 'observation' in obj);
+    if (isTrajectory) {
+        return { ...obj, _session: true, _kind: 'trajectory' };
+    }
+
     const isLiteLLMTrace = obj && typeof obj === 'object'
         && obj.request && Array.isArray(obj.request.messages)
         && (obj.response !== undefined || obj.trace_id !== undefined);
@@ -156,6 +164,7 @@ function normalizeRecord(obj: any): Request {
     return {
         ...obj,
         _session: true,
+        _kind: 'litellm',
         _rawChoice: rawChoice,
         messages,
         response: reply !== '' ? reply : obj.response,
