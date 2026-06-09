@@ -93,11 +93,12 @@ function inline(text: string): string {
         .replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>');
 }
 
-export function highlightCode(code: string, lang: string): string {
+export function highlightCode(code: unknown, lang: string): string {
+    const text = code == null ? '' : String(code);
     const l = (lang || '').toLowerCase();
-    if (l === 'py' || l === 'python') return highlightPython(code);
-    if (l === 'json') return highlightJson(code);
-    return escapeHtml(code);
+    if (l === 'py' || l === 'python') return highlightPython(text);
+    if (l === 'json') return highlightJson(text);
+    return escapeHtml(text);
 }
 
 const PY_KEYWORDS = /\b(False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|self|print)\b/;

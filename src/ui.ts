@@ -154,7 +154,10 @@ export class UI {
             } else if (a.name === 'bash') {
                 inner = toolCard('bash', String(args.command ?? ''), out, out === null ? 'in-only' : '', parse, 'bash');
             } else {
-                const argText = typeof a.arguments === 'string' ? a.arguments : JSON.stringify(a.arguments, null, 2);
+                const argText = a.arguments == null ? ''
+                    : typeof a.arguments === 'string' ? a.arguments
+                    : JSON.stringify(a.arguments, null, 2);
+                if (!a.name && !argText && out === null) continue; // nothing to show
                 inner = toolCard(`🔧 ${a.name || 'tool'}`, argText, out, out === null ? 'in-only' : '', parse, 'json');
             }
 
@@ -397,10 +400,11 @@ function sysBlock(text: string): string {
     return `<details class="sys-block"><summary>⚙ System prompt · ${fmt(text.length)} chars</summary><pre class="code">${escapeHtml(text)}</pre></details>`;
 }
 
-function toolCard(head: string, inText: string, outText: string | null, mod: string, parse: boolean, lang = 'python'): string {
-    const inHtml = parse ? highlightCode(inText, lang) : escapeHtml(inText);
+function toolCard(head: string, inText: unknown, outText: string | null, mod: string, parse: boolean, lang = 'python'): string {
+    const inStr = inText == null ? '' : String(inText);
+    const inHtml = parse ? highlightCode(inStr, lang) : escapeHtml(inStr);
     let html = `<div class="tool-card ${mod}"><div class="tool-head">${escapeHtml(head)}</div>`;
-    if (inText) html += `<div class="tool-io in"><span class="io-tag">IN</span><pre class="code">${inHtml}</pre></div>`;
+    if (inStr) html += `<div class="tool-io in"><span class="io-tag">IN</span><pre class="code">${inHtml}</pre></div>`;
     if (outText != null) html += `<div class="tool-io out"><span class="io-tag">OUT</span><pre class="code">${escapeHtml(outText)}</pre></div>`;
     html += '</div>';
     return html;

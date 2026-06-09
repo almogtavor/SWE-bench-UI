@@ -28,7 +28,8 @@ export interface Request {
     benchmark_cost?: number;
 }
 
-export function escapeHtml(text: string): string {
+export function escapeHtml(text: unknown): string {
+    const s = text == null ? '' : String(text);
     const map: Record<string, string> = {
         '&': '&amp;',
         '<': '&lt;',
@@ -36,7 +37,7 @@ export function escapeHtml(text: string): string {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return s.replace(/[&<>"']/g, m => map[m]);
 }
 
 export function getResolvedStatus(req: Request): boolean | null {

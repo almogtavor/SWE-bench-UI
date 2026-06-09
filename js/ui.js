@@ -131,7 +131,11 @@ export class UI {
                 inner = toolCard('bash', String(args.command ?? ''), out, out === null ? 'in-only' : '', parse, 'bash');
             }
             else {
-                const argText = typeof a.arguments === 'string' ? a.arguments : JSON.stringify(a.arguments, null, 2);
+                const argText = a.arguments == null ? ''
+                    : typeof a.arguments === 'string' ? a.arguments
+                        : JSON.stringify(a.arguments, null, 2);
+                if (!a.name && !argText && out === null)
+                    continue; // nothing to show
                 inner = toolCard(`🔧 ${a.name || 'tool'}`, argText, out, out === null ? 'in-only' : '', parse, 'json');
             }
             const div = `<div class="step-div"><span>Step ${steps.length + 1}${a.name ? ' · ' + escapeHtml(a.name) : ''}</span></div>`;
@@ -369,9 +373,10 @@ function sysBlock(text) {
     return `<details class="sys-block"><summary>⚙ System prompt · ${fmt(text.length)} chars</summary><pre class="code">${escapeHtml(text)}</pre></details>`;
 }
 function toolCard(head, inText, outText, mod, parse, lang = 'python') {
-    const inHtml = parse ? highlightCode(inText, lang) : escapeHtml(inText);
+    const inStr = inText == null ? '' : String(inText);
+    const inHtml = parse ? highlightCode(inStr, lang) : escapeHtml(inStr);
     let html = `<div class="tool-card ${mod}"><div class="tool-head">${escapeHtml(head)}</div>`;
-    if (inText)
+    if (inStr)
         html += `<div class="tool-io in"><span class="io-tag">IN</span><pre class="code">${inHtml}</pre></div>`;
     if (outText != null)
         html += `<div class="tool-io out"><span class="io-tag">OUT</span><pre class="code">${escapeHtml(outText)}</pre></div>`;

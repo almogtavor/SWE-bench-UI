@@ -1,4 +1,5 @@
 export function escapeHtml(text) {
+    const s = text == null ? '' : String(text);
     const map = {
         '&': '&amp;',
         '<': '&lt;',
@@ -6,7 +7,7 @@ export function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return s.replace(/[&<>"']/g, m => map[m]);
 }
 export function getResolvedStatus(req) {
     return req.resolved !== undefined ? req.resolved :
