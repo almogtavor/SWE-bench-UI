@@ -44,16 +44,26 @@ export class FileHandler {
             const parsed = this.parseFile(text);
             const callback = this.callbacks.get('onFileLoaded');
             if (callback) {
-                callback(idx, parsed, file.name);
+                callback(idx, parsed, file.name, text);
             }
         }
         catch (error) {
             alert(`Error loading file: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
+    /** Parse raw JSON/JSONL text into renderable requests (used for re-opening saved uploads too). */
+    parseText(text) {
+        return this.parseFile(text);
+    }
     parseFile(text) {
         const trimmed = text.trim();
-        if (trimmed.startsWith('[')) {
+        const raw = this.extractRecords(trimmed);
+        // Normalize every record so litellm trace.jsonl lines (request/response
+        // shaped) render the same way as flat SWE bench records.
+        return raw.map(normalizeRecord);
+    }
+    extractRecords(trimmed) {
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
             const parsed = JSON.parse(trimmed);
             if (parsed.baseline && parsed.baseline.requests) {
                 return parsed.baseline.requests;
@@ -76,8 +86,7 @@ export class FileHandler {
             const requests = [];
             for (const line of lines) {
                 try {
-                    const obj = JSON.parse(line);
-                    requests.push(obj);
+                    requests.push(JSON.parse(line));
                 }
                 catch (e) {
                     console.warn('Failed to parse JSONL line:', line);
@@ -93,5 +102,91 @@ export class FileHandler {
     on(event, callback) {
         this.callbacks.set(event, callback);
     }
+}
+/**
+ * A litellm trace.jsonl line is one LLM call: { request: { messages }, response:
+ * { choices }, prompt_tokens, completion_tokens, ... }. The viewer expects flat
+ * Request objects with top-level `messages`/`response`, so convert when we see
+ * that shape and leave any other record untouched.
+ */
+function normalizeRecord(obj) {
+    const isLiteLLMTrace = obj && typeof obj === 'object'
+        && obj.request && Array.isArray(obj.request.messages)
+        && (obj.response !== undefined || obj.trace_id !== undefined);
+    if (!isLiteLLMTrace) {
+        return obj;
+    }
+    const messages = obj.request.messages.map((m) => ({
+        role: typeof m.role === 'string' ? m.role : 'unknown',
+        content: flattenContent(m.content),
+    }));
+    const reply = extractAssistantContent(obj.response);
+    return {
+        ...obj,
+        messages,
+        response: reply !== '' ? reply : obj.response,
+        prompt_tokens: obj.prompt_tokens,
+        completion_tokens: obj.completion_tokens,
+    };
+}
+/** Message content may be a plain string or an array of {type, text} parts. */
+function flattenContent(content) {
+    if (typeof content === 'string')
+        return content;
+    if (Array.isArray(content)) {
+        return content
+            .map(part => {
+            if (typeof part === 'string')
+                return part;
+            if (part && typeof part === 'object')
+                return part.text ?? part.content ?? JSON.stringify(part);
+            return String(part);
+        })
+            .join('\n');
+    }
+    if (content == null)
+        return '';
+    return JSON.stringify(content);
+}
+/**
+ * Pull the assistant text out of a litellm response. Handles both a proper
+ * object ({ choices: [{ message: { content } }] }) and the stringified Python
+ * repr these traces store: "Choices(... message=Message(content='...', role=...))".
+ */
+function extractAssistantContent(response) {
+    if (!response)
+        return '';
+    const choices = response.choices;
+    if (!Array.isArray(choices) || choices.length === 0)
+        return '';
+    const first = choices[0];
+    if (first && typeof first === 'object') {
+        if (first.message && typeof first.message.content === 'string')
+            return first.message.content;
+        if (typeof first.text === 'string')
+            return first.text;
+        return JSON.stringify(first);
+    }
+    if (typeof first === 'string') {
+        const single = first.match(/content='((?:\\.|[^'\\])*)'/);
+        if (single)
+            return unescapePyStr(single[1]);
+        const double = first.match(/content="((?:\\.|[^"\\])*)"/);
+        if (double)
+            return unescapePyStr(double[1]);
+        return first;
+    }
+    return '';
+}
+/** Undo the escaping in a Python repr string ('\\n', "\\'", '\\\\', ...). */
+function unescapePyStr(s) {
+    return s.replace(/\\(n|t|r|'|"|\\)/g, (_match, c) => {
+        switch (c) {
+            case 'n': return '\n';
+            case 't': return '\t';
+            case 'r': return '\r';
+            default: return c; // ', ", \
+        }
+    });
 }
 //# sourceMappingURL=fileHandling.js.map

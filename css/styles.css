@@ -51,10 +51,175 @@ body {
     z-index: 100;
 }
 
+.app-layout {
+    display: flex;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
 .container {
+    flex: 1;
+    min-width: 0;
     max-width: 100%;
     margin: 0;
     padding: 20px;
+}
+
+/* ---- Library sidebar ---- */
+.sidebar {
+    width: 270px;
+    flex-shrink: 0;
+    align-self: stretch;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+}
+
+.sidebar.collapsed {
+    width: 44px;
+    align-items: center;
+    padding-top: 12px;
+}
+
+.sidebar-expand {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+}
+
+.sidebar-title {
+    color: var(--text-link);
+    font-weight: bold;
+}
+
+.sidebar-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.sidebar-btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 4px;
+    padding: 3px 7px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sidebar-btn:hover {
+    border-color: var(--text-link);
+}
+
+.sidebar-tree {
+    flex: 1;
+    padding: 6px 4px 16px;
+    overflow-y: auto;
+}
+
+.sidebar-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 16px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.tree-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tree-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.tree-row.drop-target {
+    background: var(--bg-tertiary);
+    outline: 1px dashed var(--text-link);
+}
+
+.tree-twisty {
+    width: 12px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.tree-icon {
+    flex-shrink: 0;
+}
+
+.tree-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-file .tree-name {
+    color: var(--text-primary);
+}
+
+.tree-folder .tree-name {
+    color: var(--text-accent);
+    font-weight: bold;
+}
+
+.tree-time {
+    color: var(--text-secondary);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.tree-row-actions {
+    display: none;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.tree-row:hover .tree-row-actions {
+    display: flex;
+}
+
+.tree-act {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.tree-act:hover {
+    background: var(--bg-primary);
+    color: var(--text-link);
 }
 
 header {

@@ -9,15 +9,19 @@
 <body>
     <div class="theme-toggle" id="themeToggle">🌙</div>
 
-    <div class="container">
-        <header>
-            <h1>SWE-bench-UI</h1>
-            <p>Compare SWE bench evaluation results</p>
-            <button class="add-dump-btn" onclick="window.app.addDump()">+ Add Dump</button>
-        </header>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar"></aside>
 
-        <div class="dumps-container" id="dumpsContainer"></div>
-        <input type="file" id="fileInput" accept=".json,.jsonl" style="display:none;">
+        <div class="container">
+            <header>
+                <h1>SWE-bench-UI</h1>
+                <p>Compare SWE bench evaluation results</p>
+                <button class="add-dump-btn" onclick="window.app.addDump()">+ Add Dump</button>
+            </header>
+
+            <div class="dumps-container" id="dumpsContainer"></div>
+            <input type="file" id="fileInput" accept=".json,.jsonl" style="display:none;">
+        </div>
     </div>
 
     <script type="module" src="js/app.js"><!-- Compiled from src/app.ts --></script>
