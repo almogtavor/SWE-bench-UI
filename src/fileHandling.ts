@@ -151,6 +151,7 @@ function normalizeRecord(obj: any): Request {
 
     return {
         ...obj,
+        _session: true,
         messages,
         response: reply !== '' ? reply : obj.response,
         prompt_tokens: obj.prompt_tokens,

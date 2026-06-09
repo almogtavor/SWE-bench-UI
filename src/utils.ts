@@ -7,7 +7,14 @@ export interface Request {
     response?: string | object;
     prompt_tokens?: number;
     completion_tokens?: number;
+    total_tokens?: number;
     latency_seconds?: number;
+    // Set by the litellm-trace normalizer: marks one LLM call in a session so
+    // the UI can stitch the calls into a single conversation instead of tabs.
+    _session?: boolean;
+    model?: string;
+    timestamp?: string;
+    trace_id?: string;
 }
 
 export function escapeHtml(text: string): string {

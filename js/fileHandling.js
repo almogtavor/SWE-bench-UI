@@ -134,6 +134,7 @@ function normalizeRecord(obj) {
     const reply = extractAssistantContent(obj.response);
     return {
         ...obj,
+        _session: true,
         messages,
         response: reply !== '' ? reply : obj.response,
         prompt_tokens: obj.prompt_tokens,
