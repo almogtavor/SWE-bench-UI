@@ -42,6 +42,7 @@ python -m http.server 8000
 - Markdown rendering with Python/JSON syntax highlighting (toggleable)
 - "Parse API" mode: decode raw litellm/OpenAI `Choices()` reprs into readable tool-call cards
 - Local library sidebar: uploads saved in your browser and organized into folders
+- Shareable links: traces are gzip-compressed into the URL fragment, no backend (🔗 Share)
 - Side-by-side comparison of up to 4 dumps
 - Works with any SWE bench export (JSON, JSONL, baseline/SPANS)
 

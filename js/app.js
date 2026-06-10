@@ -3,6 +3,7 @@ import { FileHandler } from './fileHandling.js';
 import { UI } from './ui.js';
 import { LibraryStore, Sidebar } from './library.js';
 import { alertModal } from './modal.js';
+import { encodeShare, decodeShare } from './share.js';
 class App {
     constructor() {
         this.maxDumps = 4;
@@ -24,7 +25,56 @@ class App {
         window.addEventListener('dragover', (e) => e.preventDefault());
         window.addEventListener('drop', (e) => e.preventDefault());
         this.sidebar.render();
-        this.setupInitialDump();
+        // A shared link (#t=...) takes over; otherwise start with one empty panel.
+        this.loadFromHash().then(loaded => { if (!loaded)
+            this.setupInitialDump(); });
+    }
+    /** Encode the loaded dumps into a #t= link, copy it, and reflect it in the URL. */
+    async share() {
+        const dumps = this.dumps
+            .filter(d => d.requests.length > 0 && d.raw)
+            .map(d => ({ n: d.name, c: d.raw }));
+        if (!dumps.length) {
+            alertModal('Load a trace first, then share.', 'Nothing to share');
+            return;
+        }
+        const token = await encodeShare({ v: 1, dumps });
+        const url = `${location.origin}${location.pathname}#t=${token}`;
+        let copied = false;
+        try {
+            await navigator.clipboard.writeText(url);
+            copied = true;
+        }
+        catch { /* clipboard blocked */ }
+        history.replaceState(null, '', url);
+        const kb = Math.round(url.length / 1024);
+        const longNote = url.length > 8000
+            ? '\n\n⚠ This link is long; some chat apps may truncate it. For very large traces a short-link backend would be more reliable.'
+            : '';
+        alertModal(`${copied ? 'Link copied to clipboard' : 'Share link (copy from the address bar)'} (${kb} KB).${longNote}`, 'Share link');
+    }
+    async loadFromHash() {
+        const m = location.hash.match(/[#&]t=([^&]+)/);
+        if (!m)
+            return false;
+        try {
+            const payload = await decodeShare(m[1]);
+            const dumps = payload?.dumps;
+            if (Array.isArray(dumps) && dumps.length) {
+                this.dumps = dumps.map((d, i) => ({
+                    name: d.n || `Dump ${i + 1}`,
+                    data: null,
+                    requests: this.fileHandler.parseText(d.c || ''),
+                    raw: d.c || '',
+                }));
+                this.render();
+                return true;
+            }
+        }
+        catch (e) {
+            alertModal(`Could not load shared trace: ${e instanceof Error ? e.message : String(e)}`, 'Share');
+        }
+        return false;
     }
     /** Reset the comparison area back to a single empty panel (the home view). */
     goHome() {
@@ -85,6 +135,7 @@ class App {
     }
     onFileLoaded(idx, requests, fileName, rawText) {
         this.dumps[idx].requests = requests;
+        this.dumps[idx].raw = rawText;
         if (this.dumps[idx].name.startsWith('Dump')) {
             this.dumps[idx].name = fileName.replace(/\.[^/.]+$/, '');
         }
@@ -107,6 +158,7 @@ class App {
         }
         try {
             this.dumps[idx].requests = this.fileHandler.parseText(upload.content);
+            this.dumps[idx].raw = upload.content;
             this.dumps[idx].name = upload.name.replace(/\.[^/.]+$/, '');
         }
         catch (e) {

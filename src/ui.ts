@@ -6,6 +6,7 @@ export interface Dump {
     name: string;
     data: unknown | null;
     requests: Request[];
+    raw?: string; // original file text, kept so the dump can be shared via URL
 }
 
 type Msg = { role: string; content: string };
