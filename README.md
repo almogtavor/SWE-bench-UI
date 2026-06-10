@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="logo.png" width="25%">
+<img src="logo.png" width="30%">
 
 # SWE-bench-UI
 
@@ -41,7 +41,7 @@ python -m http.server 8000
 - LiteLLM trace.jsonl stitched into one scrollable conversation (per-call steps, thought + code IN/OUT, collapsible system prompt)
 - Markdown rendering with Python/JSON syntax highlighting (toggleable)
 - "Parse API" mode: decode raw litellm/OpenAI `Choices()` reprs into readable tool-call cards
-- Local library sidebar: uploads saved in your browser and organized into folders
+- Local library sidebar: folders, per-trace/folder resolved counts (3/12), and bundle export/import
 - Shareable links: traces are gzip-compressed into the URL fragment, no backend (🔗 Share)
 - Side-by-side comparison of up to 4 dumps
 - Works with any SWE bench export (JSON, JSONL, baseline/SPANS)

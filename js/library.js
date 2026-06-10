@@ -2,6 +2,7 @@
 // localStorage so a user's traces and the folders they organise them into
 // survive page reloads without any backend.
 import { confirmModal, promptModal, alertModal } from './modal.js';
+import { gradeContent } from './grade.js';
 const STORAGE_KEY = 'swebench-ui-library';
 function newId() {
     const c = globalThis.crypto;
@@ -129,6 +130,53 @@ export class LibraryStore {
     getUpload(id) {
         return this.data.uploads.find(u => u.id === id);
     }
+    /** Bundle a folder and its descendants into a portable object (re-rooted). */
+    exportFolder(folderId) {
+        const ids = new Set();
+        const collect = (fid) => {
+            ids.add(fid);
+            this.data.folders.filter(f => f.parentId === fid).forEach(c => collect(c.id));
+        };
+        collect(folderId);
+        const name = this.data.folders.find(f => f.id === folderId)?.name || 'folder';
+        const folders = this.data.folders
+            .filter(f => ids.has(f.id) && f.id !== folderId)
+            .map(f => ({ id: f.id, name: f.name, parentId: f.parentId === folderId ? null : f.parentId }));
+        const uploads = this.data.uploads
+            .filter(u => u.folderId && ids.has(u.folderId))
+            .map(u => ({ name: u.name, content: u.content, uploadedAt: u.uploadedAt, folderId: u.folderId === folderId ? null : u.folderId }));
+        return { swebench_ui_bundle: 1, exported_at: Date.now(), name, folders, uploads };
+    }
+    /** Bundle the entire library. */
+    exportAll() {
+        return {
+            swebench_ui_bundle: 1,
+            exported_at: Date.now(),
+            name: 'Library',
+            folders: this.data.folders.map(f => ({ ...f })),
+            uploads: this.data.uploads.map(u => ({ name: u.name, content: u.content, uploadedAt: u.uploadedAt, folderId: u.folderId })),
+        };
+    }
+    /** Recreate a bundle under a fresh wrapper folder, remapping all ids. */
+    importBundle(bundle) {
+        if (!bundle || bundle.swebench_ui_bundle == null || !Array.isArray(bundle.uploads)) {
+            throw new Error('Not a SWE-bench-UI bundle');
+        }
+        const rootId = newId();
+        this.data.folders.push({ id: rootId, name: bundle.name || 'Imported', parentId: null });
+        const idMap = new Map();
+        (bundle.folders || []).forEach(f => idMap.set(f.id, newId()));
+        (bundle.folders || []).forEach(f => {
+            const parent = f.parentId == null ? rootId : (idMap.get(f.parentId) || rootId);
+            this.data.folders.push({ id: idMap.get(f.id), name: f.name, parentId: parent });
+        });
+        bundle.uploads.forEach(u => {
+            const folderId = u.folderId ? (idMap.get(u.folderId) || rootId) : rootId;
+            this.data.uploads.push({ id: newId(), name: u.name, content: u.content, uploadedAt: u.uploadedAt || Date.now(), folderId });
+        });
+        this.save();
+        return { folders: (bundle.folders || []).length, uploads: bundle.uploads.length, rootId };
+    }
 }
 function relativeTime(ts) {
     const diff = Date.now() - ts;
@@ -148,6 +196,24 @@ function relativeTime(ts) {
 }
 function esc(text) {
     return text.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+}
+/** "3/12" resolved badge; empty when nothing in the file is graded. */
+function gradeBadge(g) {
+    if (g.total === 0)
+        return '';
+    const cls = g.resolved === g.total ? 'all' : g.resolved === 0 ? 'none' : 'some';
+    return `<span class="tree-grade ${cls}" title="${g.resolved} of ${g.total} tasks resolved">${g.resolved}/${g.total}</span>`;
+}
+function downloadBundle(bundle, baseName) {
+    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${baseName.replace(/[^\w.-]+/g, '_')}.swebench.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 export class Sidebar {
     constructor(containerId, store, onOpen) {
@@ -175,6 +241,8 @@ export class Sidebar {
                 <span class="sidebar-title">📚 Library</span>
                 <div class="sidebar-actions">
                     <button class="sidebar-btn" data-act="new-root-folder" title="New folder">＋📁</button>
+                    <button class="sidebar-btn" data-act="import" title="Import a bundle file">📥</button>
+                    <button class="sidebar-btn" data-act="export-all" title="Export the whole library">📤</button>
                     <button class="sidebar-btn" data-act="collapse" title="Hide library">⟨</button>
                 </div>
             </div>
@@ -198,8 +266,10 @@ export class Sidebar {
                     <span class="tree-twisty" data-act="toggle">${open ? '▾' : '▸'}</span>
                     <span class="tree-icon">${open ? '📂' : '📁'}</span>
                     <span class="tree-name" data-act="rename" title="Double-click to rename">${esc(f.name)}</span>
+                    ${gradeBadge(this.gradeFolder(f.id))}
                     <span class="tree-row-actions">
                         <button class="tree-act" data-act="new-subfolder" title="New subfolder">＋</button>
+                        <button class="tree-act" data-act="export" title="Export folder">📤</button>
                         <button class="tree-act" data-act="delete" title="Delete folder">🗑</button>
                     </span>
                 </div>`;
@@ -212,6 +282,7 @@ export class Sidebar {
                     <span class="tree-twisty"></span>
                     <span class="tree-icon">📄</span>
                     <span class="tree-name" data-act="open" title="${esc(u.name)} — click to open">${esc(u.name)}</span>
+                    ${gradeBadge(gradeContent(u.content))}
                     <span class="tree-time">${relativeTime(u.uploadedAt)}</span>
                     <span class="tree-row-actions">
                         <button class="tree-act" data-act="rename" title="Rename">✎</button>
@@ -221,11 +292,30 @@ export class Sidebar {
         }
         return html;
     }
+    gradeFolder(folderId) {
+        let resolved = 0;
+        let total = 0;
+        for (const u of this.store.uploadsIn(folderId)) {
+            const g = gradeContent(u.content);
+            resolved += g.resolved;
+            total += g.total;
+        }
+        for (const f of this.store.foldersIn(folderId)) {
+            const g = this.gradeFolder(f.id);
+            resolved += g.resolved;
+            total += g.total;
+        }
+        return { resolved, total };
+    }
     wire(tree) {
         this.container.querySelector('[data-act="new-root-folder"]')
             ?.addEventListener('click', () => this.newFolder(null));
         this.container.querySelector('[data-act="collapse"]')
             ?.addEventListener('click', () => this.toggle());
+        this.container.querySelector('[data-act="import"]')
+            ?.addEventListener('click', () => this.importFlow());
+        this.container.querySelector('[data-act="export-all"]')
+            ?.addEventListener('click', () => downloadBundle(this.store.exportAll(), 'swebench-library'));
         tree.querySelectorAll('.tree-row').forEach(row => {
             const kind = row.dataset.kind;
             const id = row.dataset.id;
@@ -236,6 +326,10 @@ export class Sidebar {
             row.querySelector('[data-act="new-subfolder"]')?.addEventListener('click', e => {
                 e.stopPropagation();
                 this.newFolder(id);
+            });
+            row.querySelector('[data-act="export"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                downloadBundle(this.store.exportFolder(id), this.findFolderName(id) || 'folder');
             });
             row.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
                 e.stopPropagation();
@@ -300,6 +394,27 @@ export class Sidebar {
         if (targetFolderId)
             this.expanded.add(targetFolderId);
         this.render();
+    }
+    importFlow() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async () => {
+            const file = input.files && input.files[0];
+            if (!file)
+                return;
+            try {
+                const bundle = JSON.parse(await file.text());
+                const res = this.store.importBundle(bundle);
+                this.expanded.add(res.rootId);
+                this.render();
+                alertModal(`Imported ${res.uploads} trace${res.uploads === 1 ? '' : 's'} into "${bundle.name || 'Imported'}".`, 'Import');
+            }
+            catch (e) {
+                alertModal(`Could not import: ${e instanceof Error ? e.message : String(e)}`, 'Import');
+            }
+        };
+        input.click();
     }
     async newFolder(parentId) {
         const name = await promptModal('Folder name:', 'New folder', 'New folder');

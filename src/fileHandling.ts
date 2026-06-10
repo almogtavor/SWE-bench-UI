@@ -79,34 +79,7 @@ export class FileHandler {
     }
 
     private extractRecords(trimmed: string): any[] {
-        // First try the whole text as a single JSON value (object or array).
-        // This covers pretty-printed exports and the baseline/spans wrappers.
-        // It deliberately runs before the JSONL path because a JSONL file of
-        // objects also starts with '{' but is NOT one parseable JSON value.
-        const whole = tryParse(trimmed);
-        if (whole !== undefined) {
-            if (whole && whole.baseline && whole.baseline.requests) {
-                return whole.baseline.requests;
-            } else if (whole && whole.spans && whole.spans.requests) {
-                return whole.spans.requests;
-            } else if (whole && whole.requests && Array.isArray(whole.requests)) {
-                return whole.requests;
-            } else if (Array.isArray(whole)) {
-                return whole;
-            } else {
-                return [whole];
-            }
-        }
-
-        // Otherwise treat it as JSONL: one JSON value per line.
-        const lines = trimmed.split('\n').filter(line => line.trim());
-        const requests: any[] = [];
-        for (const line of lines) {
-            const obj = tryParse(line);
-            if (obj !== undefined) requests.push(obj);
-            else console.warn('Failed to parse JSONL line:', line);
-        }
-        return requests;
+        return extractRecords(trimmed);
     }
 
     triggerFileInput(idx: number): void {
@@ -117,6 +90,34 @@ export class FileHandler {
     on(event: string, callback: FileCallback): void {
         this.callbacks.set(event, callback);
     }
+}
+
+/**
+ * Split raw JSON/JSONL text into records: a single JSON value, a JSON array,
+ * a baseline/spans/requests wrapper, or one JSON value per line (JSONL).
+ */
+export function extractRecords(trimmed: string): any[] {
+    // Try the whole text as one JSON value (covers pretty-printed exports and
+    // the baseline/spans wrappers). Runs first because a JSONL file of objects
+    // also starts with '{' but is NOT one parseable JSON value.
+    const whole = tryParse(trimmed);
+    if (whole !== undefined) {
+        if (whole && whole.baseline && whole.baseline.requests) return whole.baseline.requests;
+        if (whole && whole.spans && whole.spans.requests) return whole.spans.requests;
+        if (whole && whole.requests && Array.isArray(whole.requests)) return whole.requests;
+        if (Array.isArray(whole)) return whole;
+        return [whole];
+    }
+
+    // Otherwise treat it as JSONL: one JSON value per line.
+    const lines = trimmed.split('\n').filter(line => line.trim());
+    const records: any[] = [];
+    for (const line of lines) {
+        const obj = tryParse(line);
+        if (obj !== undefined) records.push(obj);
+        else console.warn('Failed to parse JSONL line:', line);
+    }
+    return records;
 }
 
 /** JSON.parse that returns undefined instead of throwing on invalid input. */
