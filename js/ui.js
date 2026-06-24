@@ -158,7 +158,9 @@ export class UI {
             const r = getResolvedStatus(req);
             const mark = r === null ? '' : r ? '🟢' : '🔴';
             const cls = r === null ? '' : r ? 'pass' : 'fail';
-            return `<button class="req-btn ${cls} ${i === 0 ? 'active' : ''}" onclick="window.app.selectRequest(${i}, ${dumpIdx})">${mark} R${i + 1}</button>`;
+            const nSteps = req.steps != null ? req.steps : (req.messages || []).filter(m => m && m.role === 'assistant').length;
+            const meta = nSteps ? ` · ${nSteps}st` : '';
+            return `<button class="req-btn ${cls} ${i === 0 ? 'active' : ''}" onclick="window.app.selectRequest(${i}, ${dumpIdx})">${mark} R${i + 1}${meta}</button>`;
         }).join('');
     }
     renderRequest(dumpIdx, reqIdx, req) {
@@ -167,13 +169,23 @@ export class UI {
             return;
         const parse = this.parse;
         const taskId = req.task_id || req.instance_id || '';
-        let html = `<div class="session-summary">${statusPill(req)}${taskId ? `<span class="pill">${escapeHtml(taskId)}</span>` : ''}</div>`;
+        const nSteps = req.steps != null ? req.steps : (req.messages || []).filter(m => m && m.role === 'assistant').length;
+        const totCt = req.total_completion_tokens;
+        const perStep = (nSteps && totCt != null) ? ` · ~${fmt(Math.round(totCt / nSteps))} tok/step` : '';
+        const tokPill = totCt != null ? `<span>${fmt(totCt)} completion tok${perStep}</span>` : '';
+        const stepPill = nSteps ? `<span>${nSteps} step${nSteps === 1 ? '' : 's'}</span>` : '';
+        let html = `<div class="session-summary">${statusPill(req)}${taskId ? `<span class="pill">${escapeHtml(taskId)}</span>` : ''}${stepPill}${tokPill}</div>`;
         html += '<div class="chat">';
         if (req.messages && Array.isArray(req.messages)) {
             req.messages.forEach(msg => {
                 const role = msg.role || 'unknown';
-                const label = role === 'user' ? '👤 User' : role === 'assistant' ? '🤖 Assistant' : '⚙ ' + role;
-                const content = typeof msg.content === 'string' ? msg.content : '';
+                const tokBadge = (role === 'assistant' && msg.completion_tokens != null) ? ` · ${fmt(msg.completion_tokens)} tok` : '';
+                const label = role === 'user' ? '👤 User' : role === 'assistant' ? '🤖 Assistant' + tokBadge : '⚙ ' + role;
+                let content = typeof msg.content === 'string' ? msg.content : '';
+                // Tool results are often {"output": "...", "returncode": N} - show the
+                // output cleanly (real newlines, + exit code) instead of the raw JSON.
+                if (role !== 'user' && role !== 'assistant' && role !== 'system')
+                    content = formatToolContent(content);
                 if (role === 'system') {
                     html += sysBlock(content);
                 }
@@ -330,6 +342,20 @@ function sessionGrade(reqs) {
     return {};
 }
 /** Render a trajectory observation result (usually {output, returncode}). */
+/** A tool message whose content is a JSON string like {"output":"...","returncode":N}.
+ *  Show the decoded output (with real newlines) + exit code, not the raw JSON blob. */
+function formatToolContent(content) {
+    if (typeof content !== 'string')
+        return formatResult(content);
+    const s = content.trim();
+    if (s.startsWith('{') && (s.includes('"output"') || s.includes('"returncode"'))) {
+        try {
+            return formatResult(JSON.parse(s));
+        }
+        catch { /* not valid JSON; show as-is */ }
+    }
+    return content;
+}
 function formatResult(result) {
     if (result == null)
         return '';
