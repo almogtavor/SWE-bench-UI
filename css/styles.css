@@ -883,3 +883,5 @@ body.light-mode .tok-key { color: #116329; }
 .sw-dpos{color:#3fb950}.sw-dneg{color:#f85149}.sw-dz{color:var(--text-secondary)}
 .sw-base{color:var(--text-secondary);font-style:italic}.sw-star{color:#e0a800}
 .sw-tab tr.sw-common td.sw-task{background:rgba(63,185,80,.14)}
+
+.sw-pct{opacity:.72;font-size:.9em}

@@ -157,9 +157,11 @@ function deltaCell(v, base, isBaseline, goodDown = true) {
         return '<span class="sw-base">baseline</span>';
     const d = v - base;
     if (d === 0)
-        return '<span class="sw-dz">0</span>';
+        return '<span class="sw-dz">0 (0%)</span>';
     const good = goodDown ? d < 0 : d > 0;
-    return `<span class="${good ? 'sw-dpos' : 'sw-dneg'}">${d > 0 ? '+' : '-'}${nf(Math.abs(d))}</span>`;
+    const pct = base ? Math.round(d / base * 1000) / 10 : 0;
+    const p = base ? ` <span class="sw-pct">(${d > 0 ? '+' : ''}${pct}%)</span>` : '';
+    return `<span class="${good ? 'sw-dpos' : 'sw-dneg'}">${d > 0 ? '+' : '-'}${nf(Math.abs(d))}${p}</span>`;
 }
 // Render the comparison HTML fragment (summary + matrix) for one (pass, scope).
 export function renderSweepTables(model, pass, scope) {
@@ -311,6 +313,8 @@ const REPORT_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 @media(prefers-color-scheme:dark){:root{--bg:#12141c;--card:#1b1e28;--ink:#e6e9f0;--mut:#9aa0b0;--line:#2a2e3a;--accent:#c8cfe0;--ok:#4cd07d;--bad:#ff6b6b;--rn:#6b7280;--hi:#16341f;--avg:#1c2236;--acc2:#a29bfe}}
 :root[data-theme=dark]{--bg:#12141c;--card:#1b1e28;--ink:#e6e9f0;--mut:#9aa0b0;--line:#2a2e3a;--accent:#c8cfe0;--ok:#4cd07d;--bad:#ff6b6b;--rn:#6b7280;--hi:#16341f;--avg:#1c2236;--acc2:#a29bfe}
 :root[data-theme=light]{--bg:#f5f7fa;--card:#fff;--ink:#1a1a2e;--mut:#5a6072;--line:#e3e8f0;--accent:#2c3e50;--ok:#1e8449;--bad:#c0392b;--rn:#a0a6b4;--hi:#e8f6ee;--avg:#eef2fd;--acc2:#6c5ce7}
+.pct{opacity:.72;font-size:.9em}
+.themebtn{position:fixed;top:14px;right:16px;z-index:50;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.82rem;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 *{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:22px 30px;background:var(--bg);color:var(--ink)}
 h1{margin:0 0 3px;font-size:1.4rem}.sub{color:var(--mut);font-size:.86rem;margin-bottom:14px}
 .ctl{display:flex;gap:22px;flex-wrap:wrap;align-items:center;margin:0 0 14px;font-size:.82rem}
@@ -329,6 +333,7 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 .base{color:var(--mut);font-style:italic}.star{color:#e0a800}tr.common td.task{background:var(--hi)}.mx{font-family:ui-monospace,Menlo,monospace;font-size:.74rem}
 .legend{font-size:.76rem;color:var(--mut);margin:-6px 0 14px;line-height:1.5}
 </style></head><body>
+<button class="themebtn" id="themebtn" onclick="toggleTheme()">☾ Theme</button>
 <h1 id="h"></h1><div class="sub" id="sub"></div>
 <div class="ctl"><div class="grp"><b>View</b><span id="pb"></span></div>
 <div class="grp"><b>Scope</b><button data-sc=all class=on onclick="sc('all')">All tasks</button>
@@ -339,7 +344,7 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 <div class="legend">Cell: <span class="ok">✓</span>/<span class="bad">✗</span> · <i>N</i>st · total-tok (in+out). <span class="star">★</span> = solved by every mode. <span class="rn">·</span> = not graded.</div>
 <script>const M=__SWEEP_META__;const nf=n=>n?Number(n).toLocaleString():'—';let P=M.passes[M.passes.length-1],S='all';
 function ids(){return S==='common'?M.commonids:M.taskids}function sh(t){return M.tasks[M.taskids.indexOf(t)]}
-function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0</span>';const g=gd?d<0:d>0;return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+'</span>'}
+function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0 (0%)</span>';const g=gd?d<0:d>0;const pct=b?Math.round(d/b*1000)/10:0;const p=b?' <span class=pct>('+(d>0?'+':'')+pct+'%)</span>':'';return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+p+'</span>'}
 function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0)g++;st+=c[1];o+=c[2];i=Math.max(i,c[3])});ag[k]={so,g,st,o,i,tot:o+i}});
 const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Max In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
 M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.so+'</span>/'+a.g+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
@@ -347,6 +352,10 @@ const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);h+='<
 let m='<thead><tr><th class=task style="text-align:left">Task</th>'+M.modes.map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>';ts.forEach(t=>{const sa=M.modes.every(k=>pd[k][t]&&pd[k][t][0]===1);let r='<td class=task>'+(sa?'<span class=star>★</span> ':'')+sh(t)+'</td>';M.modes.forEach(k=>{const c=pd[k][t];if(!c||c[0]===-1){r+='<td><span class=rn>·</span></td>';return}r+='<td class=mx>'+(c[0]===1?'<span class=ok>✓</span>':'<span class=bad>✗</span>')+' · '+c[1]+'st · '+nf(c[2]+c[3])+'</td>'});m+='<tr'+(sa?' class=common':'')+'>'+r+'</tr>'});m+='</tbody>';document.getElementById('t2').innerHTML=m;document.getElementById('mxs').textContent=P+', '+ts.length+' tasks'}
 function setP(p){P=p;document.querySelectorAll('#pb button').forEach(x=>x.classList.toggle('on',x.dataset.p===p));build()}
 function sc(s){S=s;document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x.dataset.sc===s));document.getElementById('scn').innerHTML=s==='common'?'<b>Common</b> = solved by all modes ('+M.common.length+'): '+M.common.join(', '):'';build()}
+function curTheme(){return document.documentElement.getAttribute('data-theme')||(window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themebtn').innerHTML=(t==='dark'?'☀ Light':'☾ Dark');try{localStorage.setItem('sw_theme',t)}catch(e){}}
+function toggleTheme(){applyTheme(curTheme()==='dark'?'light':'dark')}
+(function(){let t;try{t=localStorage.getItem('sw_theme')}catch(e){}applyTheme(t||curTheme())})();
 document.getElementById('h').textContent=M.title||'Sweep report';document.getElementById('sub').textContent=M.modes.length+' modes × '+(M.passes.length-1)+' passes · '+M.taskids.length+' tasks';
 const pb=document.getElementById('pb');M.passes.forEach(p=>{const b=document.createElement('button');b.dataset.p=p;b.textContent=p;b.onclick=()=>setP(p);if(p===P)b.classList.add('on');pb.appendChild(b)});sc('all');build();</script>
 </body></html>`;
