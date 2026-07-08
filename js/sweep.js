@@ -217,7 +217,7 @@ export function openSweepOverlay(store, folderId, folderName) {
         return;
     }
     let pass = model.passes[model.passes.length - 1]; // default: union
-    let scope = 'all';
+    let scope = 'common';
     const overlay = document.createElement('div');
     overlay.className = 'sweep-overlay';
     overlay.innerHTML = `
@@ -232,8 +232,8 @@ export function openSweepOverlay(store, folderId, folderName) {
         <div class="sweep-ctl">
           <div class="sweep-grp"><b>View</b><span id="sweepPasses"></span></div>
           <div class="sweep-grp"><b>Scope</b>
-            <button data-sc="all" class="on">All tasks</button>
-            <button data-sc="common">Solved by all</button></div>
+            <button data-sc="common" class="on">Solved by all</button>
+            <button data-sc="all">All tasks</button></div>
         </div>
         <div class="sweep-scopenote" id="sweepScopeNote"></div>
         <div class="sweep-body" id="sweepBody"></div>
@@ -336,12 +336,12 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 <button class="themebtn" id="themebtn" onclick="toggleTheme()">☾ Theme</button>
 <h1 id="h"></h1><div class="sub" id="sub"></div>
 <div class="ctl"><div class="grp"><b>View</b><span id="pb"></span></div>
-<div class="grp"><b>Scope</b><button data-sc=all class=on onclick="sc('all')">All tasks</button>
-<button data-sc=common onclick="sc('common')">Solved by all</button></div></div>
+<div class="grp"><b>Scope</b><button data-sc=common class=on onclick="sc('common')">Solved by all</button>
+<button data-sc=all onclick="sc('all')">All tasks</button></div></div>
 <div class="legend" id="scn"></div>
 <div class="card"><div class="ttl" id="st">Summary</div><table id="t1"></table></div>
 <div class="card"><div class="ttl">Per-task matrix — <span id="mxs"></span></div><table id="t2"></table></div>
-<div class="legend">Cell: <span class="ok">✓</span>/<span class="bad">✗</span> · <i>N</i>st · total-tok (in+out). <span class="star">★</span> = solved by every mode. <span class="rn">·</span> = not graded.</div>
+<div class="legend">Cell: <span class="ok">✓</span>/<span class="bad">✗</span> · <i>N</i>st · <b>total tokens</b> = final-context (max prompt_tokens) + Σ generated. Context is append-only, so the final context is the union of all inputs — every token counted <b>once</b> (not Σ-of-requests). <span class="star">★</span> = solved by every mode. <span class="rn">·</span> = not graded.</div>
 <script>const M=__SWEEP_META__;const nf=n=>n?Number(n).toLocaleString():'—';let P=M.passes[M.passes.length-1],S='all';
 function ids(){return S==='common'?M.commonids:M.taskids}function sh(t){return M.tasks[M.taskids.indexOf(t)]}
 function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0 (0%)</span>';const g=gd?d<0:d>0;const pct=b?Math.round(d/b*1000)/10:0;const p=b?' <span class=pct>('+(d>0?'+':'')+pct+'%)</span>':'';return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+p+'</span>'}
@@ -357,6 +357,6 @@ function applyTheme(t){document.documentElement.setAttribute('data-theme',t);doc
 function toggleTheme(){applyTheme(curTheme()==='dark'?'light':'dark')}
 (function(){let t;try{t=localStorage.getItem('sw_theme')}catch(e){}applyTheme(t||curTheme())})();
 document.getElementById('h').textContent=M.title||'Sweep report';document.getElementById('sub').textContent=M.modes.length+' modes × '+(M.passes.length-1)+' passes · '+M.taskids.length+' tasks';
-const pb=document.getElementById('pb');M.passes.forEach(p=>{const b=document.createElement('button');b.dataset.p=p;b.textContent=p;b.onclick=()=>setP(p);if(p===P)b.classList.add('on');pb.appendChild(b)});sc('all');build();</script>
+const pb=document.getElementById('pb');M.passes.forEach(p=>{const b=document.createElement('button');b.dataset.p=p;b.textContent=p;b.onclick=()=>setP(p);if(p===P)b.classList.add('on');pb.appendChild(b)});sc('common');build();</script>
 </body></html>`;
 //# sourceMappingURL=sweep.js.map
