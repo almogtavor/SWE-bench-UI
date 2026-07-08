@@ -3,6 +3,7 @@
 // survive page reloads without any backend.
 import { confirmModal, promptModal, alertModal } from './modal.js';
 import { gradeContent } from './grade.js';
+import { openSweepOverlay } from './sweep.js';
 const STORAGE_KEY = 'swebench-ui-library';
 function newId() {
     const c = globalThis.crypto;
@@ -268,6 +269,7 @@ export class Sidebar {
                     <span class="tree-name" data-act="rename" title="Double-click to rename">${esc(f.name)}</span>
                     ${gradeBadge(this.gradeFolder(f.id))}
                     <span class="tree-row-actions">
+                        <button class="tree-act" data-act="compare" title="Compare sweep (tables + HTML report)">📊</button>
                         <button class="tree-act" data-act="new-subfolder" title="New subfolder">＋</button>
                         <button class="tree-act" data-act="export" title="Export folder">📤</button>
                         <button class="tree-act" data-act="delete" title="Delete folder">🗑</button>
@@ -330,6 +332,10 @@ export class Sidebar {
             row.querySelector('[data-act="export"]')?.addEventListener('click', e => {
                 e.stopPropagation();
                 downloadBundle(this.store.exportFolder(id), this.findFolderName(id) || 'folder');
+            });
+            row.querySelector('[data-act="compare"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                openSweepOverlay(this.store, id, this.findFolderName(id) || 'Sweep');
             });
             row.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
                 e.stopPropagation();
