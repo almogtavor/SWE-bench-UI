@@ -29,7 +29,7 @@ function foldTrace(content) {
         const key = tid || '(untitled)';
         let c = tasks.get(key);
         if (!c) {
-            c = { resolved: null, steps: 0, out: 0, in: 0 };
+            c = { resolved: null, steps: 0, out: 0, in: 0, spans: 0 };
             tasks.set(key, c);
         }
         if (typeof r.completion_tokens === 'number') {
@@ -38,6 +38,11 @@ function foldTrace(content) {
         }
         if (typeof r.prompt_tokens === 'number')
             c.in = Math.max(c.in, r.prompt_tokens);
+        // spans: explicit field (from a collected bundle) or count tool-result messages in this call
+        const sp = typeof r.spans === 'number' ? r.spans
+            : Array.isArray(r.messages) ? r.messages.filter(m => m && (m.role === 'tool' || m.role === 'function')).length : 0;
+        if (sp > c.spans)
+            c.spans = sp;
         if (status !== null && (c.resolved !== true))
             c.resolved = status;
     }
@@ -132,15 +137,18 @@ function aggregate(model, pass, scopeTasks) {
     const mm = model.data.get(pass);
     for (const m of model.modes) {
         const tm = mm.get(m) || new Map();
-        let a = { sol: 0, grd: 0, steps: 0, out: 0, in: 0, tot: 0 };
+        let a = { sol: 0, grd: 0, steps: 0, out: 0, in: 0, tot: 0, spans: 0, spanN: 0 };
         for (const t of scopeTasks) {
             const c = tm.get(t);
             if (!c)
                 continue;
             if (c.resolved === true)
                 a.sol++;
-            if (c.resolved !== null)
+            if (c.resolved !== null) {
                 a.grd++;
+                a.spans += c.spans;
+                a.spanN++;
+            }
             // sum every component over tasks so Total == Σ per-task (in+out),
             // consistent with the matrix (was: max(in) + Σout -> mixed max+sum bug).
             a.steps += c.steps;
@@ -171,14 +179,16 @@ export function renderSweepTables(model, pass, scope) {
     const agg = aggregate(model, pass, scopeTasks);
     const base = agg.get(model.baseline);
     const mm = model.data.get(pass);
+    const spAvg = (a) => a.spanN ? Math.round(a.spans / a.spanN * 10) / 10 : 0;
     let sum = `<table class="sw-tab"><thead><tr>
-      <th class="sw-task">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th>
+      <th class="sw-task">Mode</th><th>Solved</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th>
       <th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>`;
     for (const m of model.modes) {
         const a = agg.get(m);
         const isB = m === model.baseline;
         sum += `<tr><td class="sw-task">${escape(m)}</td>
           <td><span class="sw-ok">${a.sol}</span>/${a.grd}</td>
+          <td class="sw-num"><b>${spAvg(a)}</b> · ${nf(a.spans)}</td>
           <td class="sw-num">${nf(a.steps)}</td><td class="sw-num">${deltaCell(a.steps, base.steps, isB)}</td>
           <td class="sw-num">${nf(a.out)}</td><td class="sw-num">${deltaCell(a.out, base.out, isB)}</td>
           <td class="sw-num">${nf(a.in)}</td><td class="sw-num">${nf(a.tot)}</td>
@@ -186,8 +196,9 @@ export function renderSweepTables(model, pass, scope) {
     }
     // average
     const avg = (k) => Math.round(model.modes.reduce((s, m) => s + agg.get(m)[k], 0) / (model.modes.length || 1));
+    const avgSpAvg = Math.round(model.modes.reduce((s, m) => s + spAvg(agg.get(m)), 0) / (model.modes.length || 1) * 10) / 10;
     sum += `<tr class="sw-av"><td class="sw-task">Avg (across modes)</td>
-      <td>${avg('sol')}/${avg('grd')}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
+      <td>${avg('sol')}/${avg('grd')}</td><td class="sw-num"><b>${avgSpAvg}</b> · ${nf(avg('spans'))}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
       <td class="sw-num">${nf(avg('out'))}</td><td></td><td class="sw-num">${nf(avg('in'))}</td>
       <td class="sw-num">${nf(avg('tot'))}</td><td></td></tr></tbody></table>`;
     // matrix
@@ -202,7 +213,7 @@ export function renderSweepTables(model, pass, scope) {
                 continue;
             }
             const v = c.resolved ? '<span class="sw-ok">✓</span>' : '<span class="sw-bad">✗</span>';
-            row += `<td class="sw-mx">${v} · ${c.steps}st · ${nf(c.out + c.in)}</td>`;
+            row += `<td class="sw-mx">${v} · <b>${c.spans}sp</b> · ${c.steps}st · ${nf(c.out + c.in)}</td>`;
         }
         mx += `<tr${solAll ? ' class="sw-common"' : ''}>${row}</tr>`;
     }
@@ -301,7 +312,7 @@ export function exportSweepHtml(model) {
             blob.data[p][m] = {};
             for (const t of model.tasks) {
                 const c = mm.get(m)?.get(t);
-                blob.data[p][m][t] = c ? [c.resolved === true ? 1 : c.resolved === false ? 0 : -1, c.steps, c.out, c.in] : [-1, 0, 0, 0];
+                blob.data[p][m][t] = c ? [c.resolved === true ? 1 : c.resolved === false ? 0 : -1, c.steps, c.out, c.in, c.spans] : [-1, 0, 0, 0, 0];
             }
         }
     }
@@ -347,11 +358,11 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 <script>const M=__SWEEP_META__;const nf=n=>n?Number(n).toLocaleString():'—';let P=M.passes[M.passes.length-1],S='all';
 function ids(){return S==='common'?M.commonids:M.taskids}function sh(t){return M.tasks[M.taskids.indexOf(t)]}
 function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0 (0%)</span>';const g=gd?d<0:d>0;const pct=b?Math.round(d/b*1000)/10:0;const p=b?' <span class=pct>('+(d>0?'+':'')+pct+'%)</span>':'';return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+p+'</span>'}
-function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0)g++;st+=c[1];o+=c[2];i+=c[3]});ag[k]={so,g,st,o,i,tot:o+i}});
-const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
-M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.so+'</span>/'+a.g+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
-const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);h+='<tr class=av><td class=task>Avg (across modes)</td><td>'+av('so')+'/'+av('g')+'</td><td class=num>'+nf(av('st'))+'</td><td></td><td class=num>'+nf(av('o'))+'</td><td></td><td class=num>'+nf(av('i'))+'</td><td class=num>'+nf(av('tot'))+'</td><td></td></tr></tbody>';document.getElementById('t1').innerHTML=h;document.getElementById('st').textContent='Summary — '+P+(S==='common'?' — common only':'');
-let m='<thead><tr><th class=task style="text-align:left">Task</th>'+M.modes.map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>';ts.forEach(t=>{const sa=M.modes.every(k=>pd[k][t]&&pd[k][t][0]===1);let r='<td class=task>'+(sa?'<span class=star>★</span> ':'')+sh(t)+'</td>';M.modes.forEach(k=>{const c=pd[k][t];if(!c||c[0]===-1){r+='<td><span class=rn>·</span></td>';return}r+='<td class=mx>'+(c[0]===1?'<span class=ok>✓</span>':'<span class=bad>✗</span>')+' · '+c[1]+'st · '+nf(c[2]+c[3])+'</td>'});m+='<tr'+(sa?' class=common':'')+'>'+r+'</tr>'});m+='</tbody>';document.getElementById('t2').innerHTML=m;document.getElementById('mxs').textContent=P+', '+ts.length+' tasks'}
+function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0,sp=0,spn=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0){g++;sp+=(c[4]||0);spn++;}st+=c[1];o+=c[2];i+=c[3]});ag[k]={so,g,st,o,i,tot:o+i,sp,spavg:spn?sp/spn:0}});
+const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
+M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.so+'</span>/'+a.g+'</td><td class=num><b>'+(Math.round(a.spavg*10)/10)+'</b> · '+nf(a.sp)+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
+const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);const avsp=Math.round(M.modes.reduce((s,m)=>s+ag[m].spavg,0)/M.modes.length*10)/10;h+='<tr class=av><td class=task>Avg (across modes)</td><td>'+av('so')+'/'+av('g')+'</td><td class=num><b>'+avsp+'</b> · '+nf(av('sp'))+'</td><td class=num>'+nf(av('st'))+'</td><td></td><td class=num>'+nf(av('o'))+'</td><td></td><td class=num>'+nf(av('i'))+'</td><td class=num>'+nf(av('tot'))+'</td><td></td></tr></tbody>';document.getElementById('t1').innerHTML=h;document.getElementById('st').textContent='Summary — '+P+(S==='common'?' — common only':'');
+let m='<thead><tr><th class=task style="text-align:left">Task</th>'+M.modes.map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>';ts.forEach(t=>{const sa=M.modes.every(k=>pd[k][t]&&pd[k][t][0]===1);let r='<td class=task>'+(sa?'<span class=star>★</span> ':'')+sh(t)+'</td>';M.modes.forEach(k=>{const c=pd[k][t];if(!c||c[0]===-1){r+='<td><span class=rn>·</span></td>';return}r+='<td class=mx>'+(c[0]===1?'<span class=ok>✓</span>':'<span class=bad>✗</span>')+' · <b>'+(c[4]||0)+'sp</b> · '+c[1]+'st · '+nf(c[2]+c[3])+'</td>'});m+='<tr'+(sa?' class=common':'')+'>'+r+'</tr>'});m+='</tbody>';document.getElementById('t2').innerHTML=m;document.getElementById('mxs').textContent=P+', '+ts.length+' tasks'}
 function setP(p){P=p;document.querySelectorAll('#pb button').forEach(x=>x.classList.toggle('on',x.dataset.p===p));build()}
 function sc(s){S=s;document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x.dataset.sc===s));document.getElementById('scn').innerHTML=s==='common'?'<b>Common</b> = solved by all modes ('+M.common.length+'): '+M.common.join(', '):'';build()}
 function curTheme(){return document.documentElement.getAttribute('data-theme')||(window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}
