@@ -141,9 +141,11 @@ function aggregate(model, pass, scopeTasks) {
                 a.sol++;
             if (c.resolved !== null)
                 a.grd++;
+            // sum every component over tasks so Total == Σ per-task (in+out),
+            // consistent with the matrix (was: max(in) + Σout -> mixed max+sum bug).
             a.steps += c.steps;
             a.out += c.out;
-            a.in = Math.max(a.in, c.in);
+            a.in += c.in;
         }
         a.tot = a.out + a.in;
         out.set(m, a);
@@ -171,7 +173,7 @@ export function renderSweepTables(model, pass, scope) {
     const mm = model.data.get(pass);
     let sum = `<table class="sw-tab"><thead><tr>
       <th class="sw-task">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th>
-      <th>Σ Out</th><th>Δout</th><th>Max In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>`;
+      <th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>`;
     for (const m of model.modes) {
         const a = agg.get(m);
         const isB = m === model.baseline;
@@ -345,8 +347,8 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 <script>const M=__SWEEP_META__;const nf=n=>n?Number(n).toLocaleString():'—';let P=M.passes[M.passes.length-1],S='all';
 function ids(){return S==='common'?M.commonids:M.taskids}function sh(t){return M.tasks[M.taskids.indexOf(t)]}
 function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0 (0%)</span>';const g=gd?d<0:d>0;const pct=b?Math.round(d/b*1000)/10:0;const p=b?' <span class=pct>('+(d>0?'+':'')+pct+'%)</span>':'';return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+p+'</span>'}
-function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0)g++;st+=c[1];o+=c[2];i=Math.max(i,c[3])});ag[k]={so,g,st,o,i,tot:o+i}});
-const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Max In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
+function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0)g++;st+=c[1];o+=c[2];i+=c[3]});ag[k]={so,g,st,o,i,tot:o+i}});
+const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
 M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.so+'</span>/'+a.g+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
 const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);h+='<tr class=av><td class=task>Avg (across modes)</td><td>'+av('so')+'/'+av('g')+'</td><td class=num>'+nf(av('st'))+'</td><td></td><td class=num>'+nf(av('o'))+'</td><td></td><td class=num>'+nf(av('i'))+'</td><td class=num>'+nf(av('tot'))+'</td><td></td></tr></tbody>';document.getElementById('t1').innerHTML=h;document.getElementById('st').textContent='Summary — '+P+(S==='common'?' — common only':'');
 let m='<thead><tr><th class=task style="text-align:left">Task</th>'+M.modes.map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>';ts.forEach(t=>{const sa=M.modes.every(k=>pd[k][t]&&pd[k][t][0]===1);let r='<td class=task>'+(sa?'<span class=star>★</span> ':'')+sh(t)+'</td>';M.modes.forEach(k=>{const c=pd[k][t];if(!c||c[0]===-1){r+='<td><span class=rn>·</span></td>';return}r+='<td class=mx>'+(c[0]===1?'<span class=ok>✓</span>':'<span class=bad>✗</span>')+' · '+c[1]+'st · '+nf(c[2]+c[3])+'</td>'});m+='<tr'+(sa?' class=common':'')+'>'+r+'</tr>'});m+='</tbody>';document.getElementById('t2').innerHTML=m;document.getElementById('mxs').textContent=P+', '+ts.length+' tasks'}
