@@ -866,7 +866,7 @@ body.light-mode .tok-key { color: #116329; }
 .sweep-grp{display:flex;gap:2px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:3px}
 .sweep-grp b{color:var(--text-secondary);font-weight:600;padding:5px 8px;align-self:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
 .sweep-grp button,.sweep-ctl button{border:0;background:transparent;color:var(--text-primary);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.82rem}
-.sweep-grp button.on,.sweep-ctl button.on{background:var(--button-bg);color:#fff}
+.sweep-grp button.on,.sweep-ctl button.on{background:#0d9488;color:#fff}
 .sweep-scopenote{padding:2px 16px 8px;color:var(--text-secondary);font-size:.78rem;line-height:1.5}
 .sweep-body{padding:6px 16px 18px;overflow:auto}
 .sweep-cardttl{font-family:ui-monospace,Menlo,monospace;font-size:.82rem;font-weight:600;color:var(--text-accent);margin:14px 0 6px}

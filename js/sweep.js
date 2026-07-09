@@ -334,7 +334,10 @@ h1{margin:0 0 3px;font-size:1.4rem}.sub{color:var(--mut);font-size:.86rem;margin
 .grp{display:flex;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px}
 .grp b{color:var(--mut);font-weight:600;padding:5px 8px;align-self:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
 .ctl button{border:0;background:transparent;color:var(--ink);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.82rem}
-.ctl button.on{background:var(--acc2);color:#fff}
+.ctl button.on{background:#0d9488;color:#fff}
+@media(prefers-color-scheme:dark){.ctl button.on{background:#14b8a6;color:#04201c}}
+:root[data-theme=dark] .ctl button.on{background:#14b8a6;color:#04201c}
+:root[data-theme=light] .ctl button.on{background:#0d9488;color:#fff}
 .card{background:var(--card);border-radius:9px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:16px;overflow:auto}
 .ttl{background:linear-gradient(90deg,color-mix(in srgb,var(--acc2) 16%,var(--card)),color-mix(in srgb,var(--acc2) 8%,var(--card)));color:var(--ink);padding:8px 14px;font-family:ui-monospace,Menlo,monospace;font-size:.82rem;font-weight:600;border-bottom:1px solid var(--line)}
 table{width:100%;border-collapse:collapse;font-size:.82rem}thead tr{background:color-mix(in srgb,var(--accent) 8%,var(--card))}
