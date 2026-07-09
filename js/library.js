@@ -401,6 +401,29 @@ export class Sidebar {
             this.expanded.add(targetFolderId);
         this.render();
     }
+    /** Import a bundle from raw JSON text (used when a .swebench.json is dropped
+     *  into a panel instead of via the sidebar button). Returns true if handled. */
+    importBundleText(text) {
+        let bundle;
+        try {
+            bundle = JSON.parse(text);
+        }
+        catch {
+            return false;
+        }
+        if (!bundle || bundle.swebench_ui_bundle == null || !Array.isArray(bundle.uploads))
+            return false;
+        try {
+            const res = this.store.importBundle(bundle);
+            this.expanded.add(res.rootId);
+            this.render();
+            alertModal(`Imported ${res.uploads} trace${res.uploads === 1 ? '' : 's'} into "${bundle.name || 'Imported'}". Open the folder and click 📊 to compare.`, 'Import');
+        }
+        catch (e) {
+            alertModal(`Could not import bundle: ${e instanceof Error ? e.message : String(e)}`, 'Import');
+        }
+        return true;
+    }
     importFlow() {
         const input = document.createElement('input');
         input.type = 'file';

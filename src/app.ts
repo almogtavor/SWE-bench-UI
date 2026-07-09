@@ -152,6 +152,9 @@ class App {
     }
 
     private onFileLoaded(idx: number, requests: Request[], fileName: string, rawText: string): void {
+        // A dropped .swebench.json bundle is a library import, not a single trace:
+        // route it to the sidebar so it becomes a comparable folder (not an "ungraded" dump).
+        if (this.sidebar.importBundleText(rawText)) return;
         this.dumps[idx].requests = requests;
         this.dumps[idx].raw = rawText;
         if (this.dumps[idx].name.startsWith('Dump')) {

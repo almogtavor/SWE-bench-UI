@@ -137,7 +137,7 @@ function aggregate(model, pass, scopeTasks) {
     const mm = model.data.get(pass);
     for (const m of model.modes) {
         const tm = mm.get(m) || new Map();
-        let a = { sol: 0, grd: 0, steps: 0, out: 0, in: 0, tot: 0, spans: 0, spanN: 0 };
+        let a = { sol: 0, grd: 0, steps: 0, out: 0, in: 0, tot: 0, spans: 0, spanN: 0, solO: 0, grdO: 0 };
         for (const t of scopeTasks) {
             const c = tm.get(t);
             if (!c)
@@ -154,6 +154,16 @@ function aggregate(model, pass, scopeTasks) {
             a.steps += c.steps;
             a.out += c.out;
             a.in += c.in;
+        }
+        // solO/grdO = coverage over ALL tasks so the Solved column stays x/20 in common scope.
+        for (const t of model.tasks) {
+            const c = tm.get(t);
+            if (!c)
+                continue;
+            if (c.resolved === true)
+                a.solO++;
+            if (c.resolved !== null)
+                a.grdO++;
         }
         a.tot = a.out + a.in;
         out.set(m, a);
@@ -180,14 +190,16 @@ export function renderSweepTables(model, pass, scope) {
     const base = agg.get(model.baseline);
     const mm = model.data.get(pass);
     const spAvg = (a) => a.spanN ? Math.round(a.spans / a.spanN * 10) / 10 : 0;
+    const solHdr = scope === 'common' ? 'Solved<br><span style="font-weight:400;opacity:.7">of ' + model.tasks.length + '</span>' : 'Solved';
     let sum = `<table class="sw-tab"><thead><tr>
-      <th class="sw-task">Mode</th><th>Solved</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th>
+      <th class="sw-task">Mode</th><th>${solHdr}</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th>
       <th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>`;
     for (const m of model.modes) {
         const a = agg.get(m);
         const isB = m === model.baseline;
+        // Solved always shows true x/N coverage (not tautological in common scope).
         sum += `<tr><td class="sw-task">${escape(m)}</td>
-          <td><span class="sw-ok">${a.sol}</span>/${a.grd}</td>
+          <td><span class="sw-ok">${a.solO}</span>/${a.grdO}</td>
           <td class="sw-num"><b>${spAvg(a)}</b> · ${nf(a.spans)}</td>
           <td class="sw-num">${nf(a.steps)}</td><td class="sw-num">${deltaCell(a.steps, base.steps, isB)}</td>
           <td class="sw-num">${nf(a.out)}</td><td class="sw-num">${deltaCell(a.out, base.out, isB)}</td>
@@ -197,8 +209,9 @@ export function renderSweepTables(model, pass, scope) {
     // average
     const avg = (k) => Math.round(model.modes.reduce((s, m) => s + agg.get(m)[k], 0) / (model.modes.length || 1));
     const avgSpAvg = Math.round(model.modes.reduce((s, m) => s + spAvg(agg.get(m)), 0) / (model.modes.length || 1) * 10) / 10;
+    const avgSolO = Math.round(model.modes.reduce((s, m) => s + agg.get(m).solO, 0) / (model.modes.length || 1) * 10) / 10;
     sum += `<tr class="sw-av"><td class="sw-task">Avg (across modes)</td>
-      <td>${avg('sol')}/${avg('grd')}</td><td class="sw-num"><b>${avgSpAvg}</b> · ${nf(avg('spans'))}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
+      <td><b>${avgSolO}</b>/${avg('grdO')}</td><td class="sw-num"><b>${avgSpAvg}</b> · ${nf(avg('spans'))}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
       <td class="sw-num">${nf(avg('out'))}</td><td></td><td class="sw-num">${nf(avg('in'))}</td>
       <td class="sw-num">${nf(avg('tot'))}</td><td></td></tr></tbody></table>`;
     // matrix
@@ -257,7 +270,7 @@ export function openSweepOverlay(store, folderId, folderName) {
     const rerender = () => {
         body.innerHTML = renderSweepTables(model, pass, scope);
         scopeNote.innerHTML = scope === 'common'
-            ? `<b>Common</b> = solved by every mode (${model.common.length}): ${model.common.map(shortTask).map(escape).join(', ') || '<i>none</i>'}`
+            ? `Token/step columns use the <b>${model.common.length} tasks solved by every mode</b>: ${model.common.map(shortTask).map(escape).join(', ') || '<i>none</i>'}. The <b>Solved</b> column still shows each mode's full x/${model.tasks.length} coverage.`
             : '';
     };
     model.passes.forEach(p => {
@@ -361,13 +374,13 @@ td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--line);border
 <script>const M=__SWEEP_META__;const nf=n=>n?Number(n).toLocaleString():'—';let P=M.passes[M.passes.length-1],S='all';
 function ids(){return S==='common'?M.commonids:M.taskids}function sh(t){return M.tasks[M.taskids.indexOf(t)]}
 function dl(v,b,isB,gd){if(isB)return '<span class=base>baseline</span>';const d=v-b;if(!d)return '<span class=dz>0 (0%)</span>';const g=gd?d<0:d>0;const pct=b?Math.round(d/b*1000)/10:0;const p=b?' <span class=pct>('+(d>0?'+':'')+pct+'%)</span>':'';return '<span class="'+(g?'dpos':'dneg')+'">'+(d>0?'+':'-')+nf(Math.abs(d))+p+'</span>'}
-function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0,sp=0,spn=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0){g++;sp+=(c[4]||0);spn++;}st+=c[1];o+=c[2];i+=c[3]});ag[k]={so,g,st,o,i,tot:o+i,sp,spavg:spn?sp/spn:0}});
-const b=ag[M.baseline];let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>Solved</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
-M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.so+'</span>/'+a.g+'</td><td class=num><b>'+(Math.round(a.spavg*10)/10)+'</b> · '+nf(a.sp)+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
-const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);const avsp=Math.round(M.modes.reduce((s,m)=>s+ag[m].spavg,0)/M.modes.length*10)/10;h+='<tr class=av><td class=task>Avg (across modes)</td><td>'+av('so')+'/'+av('g')+'</td><td class=num><b>'+avsp+'</b> · '+nf(av('sp'))+'</td><td class=num>'+nf(av('st'))+'</td><td></td><td class=num>'+nf(av('o'))+'</td><td></td><td class=num>'+nf(av('i'))+'</td><td class=num>'+nf(av('tot'))+'</td><td></td></tr></tbody>';document.getElementById('t1').innerHTML=h;document.getElementById('st').textContent='Summary — '+P+(S==='common'?' — common only':'');
+function build(){const pd=M.data[P],ts=ids(),ag={};M.modes.forEach(k=>{let so=0,g=0,st=0,o=0,i=0,sp=0,spn=0,soO=0,gO=0;ts.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)so++;if(c[0]>=0){g++;sp+=(c[4]||0);spn++;}st+=c[1];o+=c[2];i+=c[3]});M.taskids.forEach(t=>{const c=pd[k][t];if(!c)return;if(c[0]===1)soO++;if(c[0]>=0)gO++;});ag[k]={so,g,st,o,i,tot:o+i,sp,spavg:spn?sp/spn:0,soO,gO}});
+const b=ag[M.baseline];const solHdr=S==='common'?'Solved<br><span style="font-weight:400;opacity:.7">of '+M.taskids.length+'</span>':'Solved';let h='<thead><tr><th class=task style="text-align:left">Mode</th><th>'+solHdr+'</th><th>Spans<br><span style="font-weight:400;opacity:.7">avg · Σ</span></th><th>Steps</th><th>Δst</th><th>Σ Out</th><th>Δout</th><th>Σ In</th><th>Total</th><th>Δtot</th></tr></thead><tbody>';
+M.modes.forEach(k=>{const a=ag[k],isB=k===M.baseline;h+='<tr><td class=task>'+k+'</td><td><span class=ok>'+a.soO+'</span>/'+a.gO+'</td><td class=num><b>'+(Math.round(a.spavg*10)/10)+'</b> · '+nf(a.sp)+'</td><td class=num>'+nf(a.st)+'</td><td class=num>'+dl(a.st,b.st,isB,1)+'</td><td class=num>'+nf(a.o)+'</td><td class=num>'+dl(a.o,b.o,isB,1)+'</td><td class=num>'+nf(a.i)+'</td><td class=num>'+nf(a.tot)+'</td><td class=num>'+dl(a.tot,b.tot,isB,1)+'</td></tr>'});
+const av=k=>Math.round(M.modes.reduce((s,m)=>s+ag[m][k],0)/M.modes.length);const avsp=Math.round(M.modes.reduce((s,m)=>s+ag[m].spavg,0)/M.modes.length*10)/10;const avsoO=Math.round(M.modes.reduce((s,m)=>s+ag[m].soO,0)/M.modes.length*10)/10;h+='<tr class=av><td class=task>Avg (across modes)</td><td><b>'+avsoO+'</b>/'+av('gO')+'</td><td class=num><b>'+avsp+'</b> · '+nf(av('sp'))+'</td><td class=num>'+nf(av('st'))+'</td><td></td><td class=num>'+nf(av('o'))+'</td><td></td><td class=num>'+nf(av('i'))+'</td><td class=num>'+nf(av('tot'))+'</td><td></td></tr></tbody>';document.getElementById('t1').innerHTML=h;document.getElementById('st').textContent='Summary — '+P+(S==='common'?' — common only':'');
 let m='<thead><tr><th class=task style="text-align:left">Task</th>'+M.modes.map(k=>'<th>'+k+'</th>').join('')+'</tr></thead><tbody>';ts.forEach(t=>{const sa=M.modes.every(k=>pd[k][t]&&pd[k][t][0]===1);let r='<td class=task>'+(sa?'<span class=star>★</span> ':'')+sh(t)+'</td>';M.modes.forEach(k=>{const c=pd[k][t];if(!c||c[0]===-1){r+='<td><span class=rn>·</span></td>';return}r+='<td class=mx>'+(c[0]===1?'<span class=ok>✓</span>':'<span class=bad>✗</span>')+' · <b>'+(c[4]||0)+'sp</b> · '+c[1]+'st · '+nf(c[2]+c[3])+'</td>'});m+='<tr'+(sa?' class=common':'')+'>'+r+'</tr>'});m+='</tbody>';document.getElementById('t2').innerHTML=m;document.getElementById('mxs').textContent=P+', '+ts.length+' tasks'}
 function setP(p){P=p;document.querySelectorAll('#pb button').forEach(x=>x.classList.toggle('on',x.dataset.p===p));build()}
-function sc(s){S=s;document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x.dataset.sc===s));document.getElementById('scn').innerHTML=s==='common'?'<b>Common</b> = solved by all modes ('+M.common.length+'): '+M.common.join(', '):'';build()}
+function sc(s){S=s;document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x.dataset.sc===s));document.getElementById('scn').innerHTML=s==='common'?'Token/step columns use the <b>'+M.common.length+' tasks solved by every mode</b>: '+M.common.join(', ')+'. The <b>Solved</b> column still shows each mode\\'s full x/'+M.taskids.length+' coverage.':'';build()}
 function curTheme(){return document.documentElement.getAttribute('data-theme')||(window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themebtn').innerHTML=(t==='dark'?'☀ Light':'☾ Dark');try{localStorage.setItem('sw_theme',t)}catch(e){}}
 function toggleTheme(){applyTheme(curTheme()==='dark'?'light':'dark')}
