@@ -4,6 +4,7 @@
 
 import { confirmModal, promptModal, alertModal } from './modal.js';
 import { gradeContent, Grade } from './grade.js';
+import { openSweepOverlay } from './sweep.js';
 
 export interface LibFolder {
     id: string;
@@ -313,6 +314,7 @@ export class Sidebar {
                     <span class="tree-name" data-act="rename" title="Double-click to rename">${esc(f.name)}</span>
                     ${gradeBadge(this.gradeFolder(f.id))}
                     <span class="tree-row-actions">
+                        <button class="tree-act" data-act="compare" title="Compare sweep (tables + HTML report)">📊</button>
                         <button class="tree-act" data-act="new-subfolder" title="New subfolder">＋</button>
                         <button class="tree-act" data-act="export" title="Export folder">📤</button>
                         <button class="tree-act" data-act="delete" title="Delete folder">🗑</button>
@@ -381,6 +383,10 @@ export class Sidebar {
                 e.stopPropagation();
                 downloadBundle(this.store.exportFolder(id), this.findFolderName(id) || 'folder');
             });
+            row.querySelector('[data-act="compare"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                openSweepOverlay(this.store, id, this.findFolderName(id) || 'Sweep');
+            });
             row.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
                 e.stopPropagation();
                 this.deleteItem(kind, id);
@@ -439,6 +445,23 @@ export class Sidebar {
         }
         if (targetFolderId) this.expanded.add(targetFolderId);
         this.render();
+    }
+
+    /** Import a bundle from raw JSON text (used when a .swebench.json is dropped
+     *  into a panel instead of via the sidebar button). Returns true if handled. */
+    importBundleText(text: string): boolean {
+        let bundle: any;
+        try { bundle = JSON.parse(text); } catch { return false; }
+        if (!bundle || bundle.swebench_ui_bundle == null || !Array.isArray(bundle.uploads)) return false;
+        try {
+            const res = this.store.importBundle(bundle);
+            this.expanded.add(res.rootId);
+            this.render();
+            alertModal(`Imported ${res.uploads} trace${res.uploads === 1 ? '' : 's'} into "${bundle.name || 'Imported'}". Open the folder and click 📊 to compare.`, 'Import');
+        } catch (e) {
+            alertModal(`Could not import bundle: ${e instanceof Error ? e.message : String(e)}`, 'Import');
+        }
+        return true;
     }
 
     private importFlow(): void {
