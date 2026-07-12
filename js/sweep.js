@@ -199,7 +199,23 @@ export function renderSweepTables(model, pass, scope) {
     const base = agg.get(model.baseline);
     const mm = model.data.get(pass);
     const spAvg = (a) => a.spanN ? Math.round(a.spans / a.spanN * 10) / 10 : 0;
-    const solHdr = scope === 'common' ? 'Solved<br><span style="font-weight:400;opacity:.7">of ' + model.tasks.length + '</span>' : 'Solved';
+    // real passes = all pass labels except the synthetic union -> each mode's per-pass
+    // solve counts, so the Solved cell shows the AVERAGE per pass (X.X/N) with the
+    // individual pass counts below (what compounds the average). Mirrors the canonical
+    // build_sglang_report.py template.
+    const realPasses = model.passes.filter(p => p !== model.unionLabel);
+    const perPassSolved = (mode) => realPasses.map(pl => {
+        const pd = model.data.get(pl);
+        if (!pd || !pd.get(mode))
+            return 0;
+        let s = 0;
+        for (const t of model.tasks) {
+            if (pd.get(mode).get(t)?.resolved === true)
+                s++;
+        }
+        return s;
+    });
+    const solHdr = 'Solved<br><span style="font-weight:400;opacity:.7">avg/pass of ' + model.tasks.length + '</span>';
     const grpLabel = scope === 'common'
         ? `← over the ${commonTasks.length} tasks solved by <b>all modes in ${pass}</b> (same-work comparison) →`
         : `← over all ${scopeTasks.length} tasks →`;
@@ -211,9 +227,12 @@ export function renderSweepTables(model, pass, scope) {
     for (const m of model.modes) {
         const a = agg.get(m);
         const isB = m === model.baseline;
-        // Solved always shows true x/N coverage (not tautological in common scope).
+        // Solved cell = AVERAGE per-pass solve count (X.X/N) with the per-pass counts
+        // below. Denominator is the full task set so every mode/pass shares one base.
+        const pps = perPassSolved(m);
+        const avgPP = Math.round(pps.reduce((s, x) => s + x, 0) / (pps.length || 1) * 10) / 10;
         sum += `<tr><td class="sw-task">${escape(m)}</td>
-          <td><span class="sw-ok">${a.solO}</span>/${a.grdO}</td>
+          <td><span class="sw-ok">${avgPP}</span>/${model.tasks.length}<br><span style="opacity:.6;font-weight:400;font-size:.85em">${pps.join(' · ')}</span></td>
           <td class="sw-num"><b>${spAvg(a)}</b> · ${nf(a.spans)}</td>
           <td class="sw-num">${nf(a.steps)}</td><td class="sw-num">${deltaCell(a.steps, base.steps, isB)}</td>
           <td class="sw-num">${nf(a.out)}</td><td class="sw-num">${deltaCell(a.out, base.out, isB)}</td>
@@ -223,10 +242,12 @@ export function renderSweepTables(model, pass, scope) {
     // average
     const avg = (k) => Math.round(model.modes.reduce((s, m) => s + agg.get(m)[k], 0) / (model.modes.length || 1));
     const avgSpAvg = Math.round(model.modes.reduce((s, m) => s + spAvg(agg.get(m)), 0) / (model.modes.length || 1) * 10) / 10;
-    const avgSolO = Math.round(model.modes.reduce((s, m) => s + agg.get(m).solO, 0) / (model.modes.length || 1) * 10) / 10;
-    const solBreak = model.modes.map(m => agg.get(m).solO).join('·');
+    // each mode's own avg-per-pass, then averaged across modes (matches per-mode cells)
+    const modeAvgPP = model.modes.map(m => { const p = perPassSolved(m); return p.reduce((s, x) => s + x, 0) / (p.length || 1); });
+    const avgSolO = Math.round(modeAvgPP.reduce((s, x) => s + x, 0) / (modeAvgPP.length || 1) * 10) / 10;
+    const solBreak = modeAvgPP.map(x => Math.round(x * 10) / 10).join('·');
     sum += `<tr class="sw-av"><td class="sw-task">Avg (across modes)</td>
-      <td><b>${avgSolO}</b>/${avg('grdO')} <span style="font-weight:400;opacity:.7">(${solBreak})</span></td><td class="sw-num"><b>${avgSpAvg}</b> · ${nf(avg('spans'))}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
+      <td><b>${avgSolO}</b>/${model.tasks.length} <span style="font-weight:400;opacity:.7">(${solBreak} by mode)</span></td><td class="sw-num"><b>${avgSpAvg}</b> · ${nf(avg('spans'))}</td><td class="sw-num">${nf(avg('steps'))}</td><td></td>
       <td class="sw-num">${nf(avg('out'))}</td><td></td><td class="sw-num">${nf(avg('in'))}</td>
       <td class="sw-num">${nf(avg('tot'))}</td><td></td></tr></tbody></table>`;
     // matrix
